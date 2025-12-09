@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, AtSign, Eye, EyeOff } from 'lucide-react';
 import './Register.css';
 
-function Register({ onLogin }) {
+function Register() {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -55,10 +55,30 @@ function Register({ onLogin }) {
     }
 
     setLoading(true);
-    setTimeout(() => {
-      onLogin();
-      navigate('/dashboard');
-    }, 1000);
+
+    try {
+      // Call Vercel API
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Registration failed');
+      }
+
+      alert('Registration successful! Please login.');
+      navigate('/login');
+
+    } catch (error) {
+      console.error('Registration Error:', error);
+      alert('Error registering user: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const strength = getStrengthLabel();
@@ -138,9 +158,6 @@ function Register({ onLogin }) {
                   onChange={handleChange}
                   required
                 />
-                {formData.username && (
-                  <span className="checking-indicator">✓ Available</span>
-                )}
               </div>
             </div>
 

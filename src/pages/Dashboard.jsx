@@ -1,11 +1,28 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, Flame, TrendingUp, Award, BookOpen, Trophy, UserCircle, Star, ArrowRight, BarChart3 } from 'lucide-react';
+import Cookies from 'js-cookie';
+import { supabase } from '../supabaseClient';
 import Navbar from '../components/Navbar';
-import { currentUser, leaderboardData } from '../data/mockData';
 import './Dashboard.css';
 
 function Dashboard({ onLogout }) {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [stats, setStats] = useState({
+    totalQuestions: 0,
+    dailyStreak: 0,
+    avgScore: 0,
+    currentRank: 0
+  });
+  // Default values matching original mock structure for safety
+  const [gameStats, setGameStats] = useState({
+    mvpSpeed: { best: 0 },
+    history: { questionsAnswered: 0 },
+    trivia: { currentStreak: 0 },
+    guessPlayer: { successRate: 0 }
+  });
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [animatedStats, setAnimatedStats] = useState({
     totalQuestions: 0,
@@ -14,10 +31,125 @@ function Dashboard({ onLogout }) {
     currentRank: 0
   });
 
-  const stats = currentUser.stats;
-  const gameStats = currentUser.gameModeStats;
-
   useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const decodeJwt = (token) => {
+    try {
+      return JSON.parse(atob(token.split('.')[1]));
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const fetchDashboardData = async () => {
+    try {
+      // 1. Get User ID from Token
+      const token = Cookies.get('auth_token');
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+      const decoded = decodeJwt(token);
+      const userId = decoded?.id;
+      const username = decoded?.username;
+      if (!userId) {
+        setLoading(false);
+        return;
+      }
+
+      setCurrentUser({ username }); // Basic info for UI if needed
+
+      // 2. Fetch User Global Stats
+      let { data: globalStats } = await supabase
+        .from('user_global_stats')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (!globalStats) {
+        // Init stats if missing
+        globalStats = { total_questions: 0, daily_streak: 0, avg_score: 0, current_rank: 0 };
+      }
+
+      // Calculate Rank (simple count of users with more points)
+      const { count: rankCount } = await supabase
+        .from('user_global_stats')
+        .select('user_id', { count: 'exact', head: true })
+        .gt('total_points', globalStats.total_points || 0);
+
+      const realRank = (rankCount || 0) + 1;
+
+      setStats({
+        totalQuestions: globalStats.total_questions,
+        dailyStreak: globalStats.daily_streak,
+        avgScore: globalStats.avg_score,
+        currentRank: realRank
+      });
+
+      // 3. Fetch Game Mode Stats
+      const { data: modes } = await supabase
+        .from('user_game_mode_stats')
+        .select('*')
+        .eq('user_id', userId);
+
+      const newGameStats = {
+        mvpSpeed: { best: 0 },
+        history: { questionsAnswered: 0 },
+        trivia: { currentStreak: 0 },
+        guessPlayer: { successRate: 0 }
+      };
+
+      if (modes) {
+        modes.forEach(m => {
+          if (m.game_mode === 'mvp_speed') newGameStats.mvpSpeed.best = m.best_score;
+          if (m.game_mode === 'history') newGameStats.history.questionsAnswered = m.games_played; // Approx
+          if (m.game_mode === 'trivia') newGameStats.trivia.currentStreak = m.current_streak;
+          if (m.game_mode === 'guess_player') newGameStats.guessPlayer.successRate = m.success_rate;
+        });
+      }
+      setGameStats(newGameStats);
+
+      // 4. Fetch Leaderboard (Top 10)
+      const { data: topUsers } = await supabase
+        .from('user_global_stats')
+        .select(`
+          total_points,
+          avg_score,
+          users (username, last_active)
+        `)
+        .order('total_points', { ascending: false })
+        .limit(10);
+
+      if (topUsers) {
+        const formattedLeaderboard = topUsers.map((u, index) => ({
+          rank: index + 1,
+          username: u.users.username,
+          points: u.total_points,
+          avgScore: u.avg_score,
+          lastActive: new Date(u.users.last_active).toLocaleDateString()
+        }));
+        setLeaderboard(formattedLeaderboard);
+      }
+
+      setLoading(false);
+
+      // Trigger animations
+      startAnimations({
+        totalQuestions: globalStats.total_questions,
+        dailyStreak: globalStats.daily_streak,
+        avgScore: globalStats.avg_score,
+        currentRank: realRank
+      });
+
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      setLoading(false);
+    }
+  };
+
+  const startAnimations = (finalStats) => {
     const duration = 1500;
     const steps = 60;
     const stepDuration = duration / steps;
@@ -45,22 +177,26 @@ function Dashboard({ onLogout }) {
       }, stepDuration);
     };
 
-    animateValue(0, stats.totalQuestions, (val) => {
+    animateValue(0, finalStats.totalQuestions || 0, (val) => {
       setAnimatedStats(prev => ({ ...prev, totalQuestions: val }));
     });
 
-    animateValue(0, stats.dailyStreak, (val) => {
+    animateValue(0, finalStats.dailyStreak || 0, (val) => {
       setAnimatedStats(prev => ({ ...prev, dailyStreak: val }));
     });
 
-    animateValue(0, stats.avgScore, (val) => {
+    animateValue(0, finalStats.avgScore || 0, (val) => {
       setAnimatedStats(prev => ({ ...prev, avgScore: val }));
     });
 
-    animateValue(0, stats.currentRank, (val) => {
+    animateValue(0, finalStats.currentRank || 0, (val) => {
       setAnimatedStats(prev => ({ ...prev, currentRank: val }));
     });
-  }, []);
+  };
+
+  if (loading) {
+    return <div className="dashboard-loading"><div className="loading-spinner"></div></div>;
+  }
 
   return (
     <div className="dashboard">
@@ -196,8 +332,8 @@ function Dashboard({ onLogout }) {
               <div className="col-active">Last Active</div>
             </div>
 
-            {leaderboardData['global'].map((user, index) => {
-              const isCurrentUser = user.username === currentUser.username;
+            {leaderboard.map((user, index) => {
+              const isCurrentUser = currentUser && user.username === currentUser.username;
               return (
                 <div
                   key={index}
@@ -218,7 +354,7 @@ function Dashboard({ onLogout }) {
                     )}
                   </div>
                   <div className="col-player">{user.username}</div>
-                  <div className="col-points">{user.points.toLocaleString()}</div>
+                  <div className="col-points">{user.points ? user.points.toLocaleString() : 0}</div>
                   <div className="col-avg">{user.avgScore}%</div>
                   <div className="col-active">{user.lastActive}</div>
                 </div>

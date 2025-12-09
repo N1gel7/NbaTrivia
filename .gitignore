@@ -64,3 +64,4 @@ yarn.lock
 # Optional: If you're using TypeScript, you might also want to add:
 # TypeScript output
 *.tsbuildinfo
+.vercel

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import Cookies from 'js-cookie';
+import { supabase } from '../../supabaseClient';
 import Navbar from '../../components/Navbar';
-import { mvpNames } from '../../data/mockData';
 import './MVPSpeedChallenge.css';
 
 function MVPSpeedChallenge() {
@@ -11,11 +12,62 @@ function MVPSpeedChallenge() {
   const [correctAnswers, setCorrectAnswers] = useState([]);
   const [incorrectAnswers, setIncorrectAnswers] = useState([]);
   const [score, setScore] = useState(0);
-  const [personalBest, setPersonalBest] = useState(12);
+  const [personalBest, setPersonalBest] = useState(0);
+  const [allMVPs, setAllMVPs] = useState([]);
+  const [loading, setLoading] = useState(true);
   const inputRef = useRef(null);
   const navigate = useNavigate();
 
-  const allMVPs = [...new Set(mvpNames.map(name => name.toLowerCase()))];
+  useEffect(() => {
+    fetchGameData();
+  }, []);
+
+  const decodeJwt = (token) => {
+    try {
+      return JSON.parse(atob(token.split('.')[1]));
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const fetchGameData = async () => {
+    try {
+      // 1. Fetch MVP Names
+      const { data: mvpData, error: mvpError } = await supabase
+        .from('mvp_winners')
+        .select('first_name, last_name');
+
+      if (mvpError) throw mvpError;
+
+      // Construct full names and deduplicate
+      const names = new Set();
+      mvpData.forEach(p => {
+        names.add(`${p.first_name} ${p.last_name}`.toLowerCase());
+      });
+      setAllMVPs(Array.from(names));
+
+      // 2. Fetch Personal Best
+      const token = Cookies.get('auth_token');
+      if (token) {
+        const decoded = decodeJwt(token);
+        if (decoded?.id) {
+          const { data: stats } = await supabase
+            .from('user_game_mode_stats')
+            .select('best_score')
+            .eq('user_id', decoded.id)
+            .eq('game_mode', 'mvp_speed')
+            .single();
+
+          if (stats) setPersonalBest(stats.best_score);
+        }
+      }
+
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching game data:', error);
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (gameState === 'playing' && timeLeft > 0) {
@@ -39,7 +91,7 @@ function MVPSpeedChallenge() {
   };
 
   const handleInputChange = (e) => {
-    const value = e.target.value.trim();
+    const value = e.target.value; // Don't trim while typing
     setInput(value);
   };
 
@@ -69,18 +121,44 @@ function MVPSpeedChallenge() {
     }
   };
 
-  const endGame = () => {
+  const endGame = async () => {
     setGameState('post');
     if (score > personalBest) {
       setPersonalBest(score);
+
+      // Save new record
+      const token = Cookies.get('auth_token');
+      if (token) {
+        const decoded = jwt.decode(token);
+        try {
+          // Check if row exists first (upsert logic in Supabase via conflict)
+          await supabase
+            .from('user_game_mode_stats')
+            .upsert({
+              user_id: decoded.id,
+              game_mode: 'mvp_speed',
+              best_score: score,
+              games_played: 1, // Start logic usually increments this, simplified here
+              // current_streak... logic omitted for simplicity
+            }, { onConflict: 'user_id, game_mode' });
+
+        } catch (err) {
+          console.error('Error saving score:', err);
+        }
+      }
     }
   };
 
   const handleLogout = () => {
+    Cookies.remove('auth_token');
     navigate('/login');
   };
 
-  const totalMVPs = allMVPs.length;
+  if (loading) {
+    return <div className="loading-screen">Loading Game Data...</div>;
+  }
+
+  const totalMVPs = allMVPs.length || 1; // avoid divide by zero
   const percentage = Math.round((score / totalMVPs) * 100);
 
   return (
@@ -150,10 +228,10 @@ function MVPSpeedChallenge() {
               <div className="score-text">MVPs Named!</div>
             </div>
             <div className="score-percentage">
-              That's {percentage}% of all MVPs
+              That's {percentage}% of all unique MVPs
             </div>
 
-            {score > personalBest && (
+            {score >= personalBest && score > 0 && (
               <div className="new-record">
                 🎉 New Personal Best! 🎉
               </div>

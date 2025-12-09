@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, Lock, Eye, EyeOff } from 'lucide-react';
+import Cookies from 'js-cookie';
 import './Login.css';
+
+
 
 function Login({ onLogin }) {
   const [username, setUsername] = useState('');
@@ -12,21 +15,54 @@ function Login({ onLogin }) {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
+  const canLogin = () => {
+    const lastAttempt = localStorage.getItem('last_login_attempt');
+    if (!lastAttempt) return true;
+
+    // Lenient rate limit: 1 sec delay between attempts
+    const timeSince = Date.now() - parseInt(lastAttempt);
+    return timeSince > 1000;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (!canLogin()) {
+      setError('Please wait a moment before trying again.');
+      return;
+    }
+
+    localStorage.setItem('last_login_attempt', Date.now().toString());
     setLoading(true);
 
+    try {
+      // Call Vercel API
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
 
-    setTimeout(() => {
-      if (username === 'CurrySplash' && password === 'password123') {
-        onLogin();
-        navigate('/dashboard');
-      } else {
-        setError('Invalid username or password');
-        setLoading(false);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Login failed');
       }
-    }, 1000);
+
+      // 4. Set Cookie (Token is now returned from API)
+      Cookies.set('auth_token', data.token, { expires: rememberMe ? 7 : 1 });
+
+      // 5. Success
+      onLogin();
+      navigate('/dashboard');
+
+    } catch (err) {
+      console.error('Login error:', err);
+      setError(err.message || 'Failed to login');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -38,8 +74,12 @@ function Login({ onLogin }) {
           <p className="tagline">Test Your NBA Knowledge</p>
           <div className="stats-preview">
             <div className="stat-item">
-              <span className="stat-number">10,000+</span>
-              <span className="stat-label">Players Worldwide</span>
+              <span className="stat-number">10k+</span>
+              <span className="stat-label">Players</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-number">5k+</span>
+              <span className="stat-label">Questions</span>
             </div>
           </div>
         </div>
@@ -47,18 +87,17 @@ function Login({ onLogin }) {
       <div className="login-right">
         <div className="login-card">
           <h2>Welcome Back</h2>
-          <p className="login-subtitle">Sign in to continue your journey</p>
-
-          {error && <div className="error-message">{error}</div>}
+          <p className="login-subtitle">Please enter your details</p>
 
           <form onSubmit={handleSubmit}>
             <div className="input-group">
+              <label>Username</label>
               <div className="input-wrapper">
                 <User className="input-icon" size={18} />
                 <input
                   type="text"
                   className="input"
-                  placeholder="Username"
+                  placeholder="Enter your username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
@@ -67,12 +106,13 @@ function Login({ onLogin }) {
             </div>
 
             <div className="input-group">
+              <label>Password</label>
               <div className="input-wrapper">
                 <Lock className="input-icon" size={18} />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   className="input"
-                  placeholder="Password"
+                  placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -87,29 +127,31 @@ function Login({ onLogin }) {
               </div>
             </div>
 
-            <div className="form-options">
+            <div className="form-actions">
               <label className="checkbox-label">
                 <input
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
                 />
-                <span>Remember me</span>
+                <span>Remember for 30 days</span>
               </label>
-              <Link to="#" className="forgot-password">Forgot password?</Link>
+              <a href="#" className="forgot-password">Forgot password?</a>
             </div>
+
+            {error && <div className="error-message">{error}</div>}
 
             <button
               type="submit"
               className="btn btn-primary btn-full"
               disabled={loading}
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? 'Logging in...' : 'Sign In'}
             </button>
           </form>
 
-          <p className="signup-link">
-            Don't have an account? <Link to="/register">Sign up</Link>
+          <p className="register-link">
+            Don't have an account? <Link to="/register">Sign up for free</Link>
           </p>
         </div>
       </div>
