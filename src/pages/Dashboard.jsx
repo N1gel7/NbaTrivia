@@ -6,7 +6,7 @@ import { currentUser, leaderboardData } from '../data/mockData';
 import './Dashboard.css';
 
 function Dashboard({ onLogout }) {
-  const [leaderboardTab, setLeaderboardTab] = useState('global');
+
   const [animatedStats, setAnimatedStats] = useState({
     totalQuestions: 0,
     dailyStreak: 0,
@@ -185,26 +185,7 @@ function Dashboard({ onLogout }) {
         {/* Leaderboard Section */}
         <div className="leaderboard-section">
           <h2 className="section-title">Leaderboard</h2>
-          <div className="leaderboard-tabs">
-            <button
-              className={`tab ${leaderboardTab === 'global' ? 'active' : ''}`}
-              onClick={() => setLeaderboardTab('global')}
-            >
-              Global
-            </button>
-            <button
-              className={`tab ${leaderboardTab === 'friends' ? 'active' : ''}`}
-              onClick={() => setLeaderboardTab('friends')}
-            >
-              Friends
-            </button>
-            <button
-              className={`tab ${leaderboardTab === 'week' ? 'active' : ''}`}
-              onClick={() => setLeaderboardTab('week')}
-            >
-              This Week
-            </button>
-          </div>
+
 
           <div className="leaderboard-table-container">
             <div className="leaderboard-header-row">
@@ -215,7 +196,7 @@ function Dashboard({ onLogout }) {
               <div className="col-active">Last Active</div>
             </div>
 
-            {leaderboardData[leaderboardTab].map((user, index) => {
+            {leaderboardData['global'].map((user, index) => {
               const isCurrentUser = user.username === currentUser.username;
               return (
                 <div
