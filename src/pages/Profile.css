@@ -1,0 +1,287 @@
+.profile-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--cream) 0%, var(--off-white) 100%);
+}
+
+.profile-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px;
+}
+
+/* Profile Header */
+.profile-header {
+  background: white;
+  border-radius: 16px;
+  padding: 40px;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  margin-bottom: 32px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.profile-avatar-large {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: var(--burnt-orange);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 64px;
+  border: 4px solid var(--navy-blue);
+  flex-shrink: 0;
+}
+
+.profile-info h1 {
+  font-size: 36px;
+  color: var(--dark-navy);
+  margin-bottom: 8px;
+}
+
+.profile-email {
+  color: var(--gray);
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.profile-join-date {
+  color: var(--gray);
+  font-size: 14px;
+}
+
+/* Stats Section */
+.stats-section {
+  margin-bottom: 48px;
+}
+
+.section-title {
+  font-size: 28px;
+  color: var(--dark-navy);
+  margin-bottom: 24px;
+  font-weight: 700;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 24px;
+}
+
+.stat-box {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.stat-box:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.stat-box .stat-icon {
+  font-size: 48px;
+}
+
+.stat-details {
+  flex: 1;
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--dark-navy);
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: var(--gray);
+}
+
+/* Game Mode Stats */
+.game-mode-stats-section {
+  margin-bottom: 48px;
+}
+
+.game-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.game-stat-card {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.game-stat-card h3 {
+  font-size: 20px;
+  color: var(--dark-navy);
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--light-gray);
+}
+
+.game-stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--off-white);
+}
+
+.game-stat-item:last-child {
+  border-bottom: none;
+}
+
+.game-stat-item span:first-child {
+  color: var(--gray);
+  font-size: 14px;
+}
+
+.stat-value-small {
+  font-weight: 700;
+  color: var(--dark-navy);
+  font-size: 16px;
+}
+
+/* Achievements */
+.achievements-section {
+  margin-bottom: 48px;
+}
+
+.achievements-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 20px;
+}
+
+.achievement-card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.achievement-card.earned {
+  border: 2px solid var(--gold);
+}
+
+.achievement-card.locked {
+  opacity: 0.5;
+  background: var(--light-gray);
+}
+
+.achievement-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.achievement-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.achievement-name {
+  font-weight: 600;
+  color: var(--dark-navy);
+  font-size: 14px;
+}
+
+.achievement-locked {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 20px;
+}
+
+/* Activity Section */
+.activity-section {
+  margin-bottom: 48px;
+}
+
+.activity-timeline {
+  background: white;
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.activity-item {
+  display: flex;
+  gap: 24px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--off-white);
+}
+
+.activity-item:last-child {
+  border-bottom: none;
+}
+
+.activity-date {
+  min-width: 120px;
+  font-weight: 600;
+  color: var(--gray);
+  font-size: 14px;
+}
+
+.activity-content {
+  flex: 1;
+}
+
+.activity-game {
+  font-weight: 600;
+  color: var(--dark-navy);
+  margin-bottom: 4px;
+  font-size: 16px;
+}
+
+.activity-score {
+  color: var(--gray);
+  font-size: 14px;
+}
+
+/* Profile Actions */
+.profile-actions {
+  text-align: center;
+  padding: 32px 0;
+}
+
+@media (max-width: 768px) {
+  .profile-content {
+    padding: 16px;
+  }
+
+  .profile-header {
+    flex-direction: column;
+    text-align: center;
+    padding: 24px;
+  }
+
+  .stats-grid,
+  .game-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .achievements-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .activity-item {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
