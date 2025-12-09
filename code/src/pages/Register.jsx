@@ -8,8 +8,11 @@ function Register() {
   const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
+
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [securityQuestion, setSecurityQuestion] = useState('What was your first pet\'s name?');
+  const [securityAnswer, setSecurityAnswer] = useState('');
 
   const [showPassword, setShowPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
@@ -70,8 +73,21 @@ function Register() {
       strength = strength + 1;
     }
 
+    const criteria = {
+      length: pass.length >= 8,
+      lower: hasLower,
+      upper: hasUpper,
+      number: hasDig,
+      special: hasSpec
+    };
+    setPasswordCriteria(criteria);
+
     setPasswordStrength(strength);
   }
+
+  const [passwordCriteria, setPasswordCriteria] = useState({
+    length: false, lower: false, upper: false, number: false, special: false
+  });
 
   function handleFirstNameChange(e) {
     setFirstName(e.target.value);
@@ -129,6 +145,18 @@ function Register() {
       return;
     }
 
+    if (passwordStrength < 4) { // Assuming 4 is 'Strong' or at least enforce 3 'Medium'
+      // Let's enforce Medium (3) at minimum for good UX, or 4 if very strict.
+      // User asked for "ensure password is strong".
+      // Based on logic: 8 chars (1) + Lower+Upper (1) + Dig (1) + Spec (1) = 4 max.
+      // Let's require at least 3 (Medium) which usually means length + 2 other factors.
+      // Or strictly require all 4 for "Strong". The prompt says "ensure password is strong".
+      if (passwordStrength < 4) {
+        alert('Password must be strong. Please check the requirements below.');
+        return;
+      }
+    }
+
     setLoading(true);
 
     const postData = {
@@ -137,7 +165,8 @@ function Register() {
       username: username,
       email: email,
       password: password,
-      confirmPassword: confirmPassword
+      securityQuestion: securityQuestion,
+      securityAnswer: securityAnswer
     };
 
     fetch('/api/register', {
@@ -306,6 +335,36 @@ function Register() {
 
             <div className="input-group">
               <div className="input-wrapper">
+                <select
+                  className="input"
+                  value={securityQuestion}
+                  onChange={(e) => setSecurityQuestion(e.target.value)}
+                  required
+                >
+                  <option value="What was your first pet's name?">What was your first pet's name?</option>
+                  <option value="What city were you born in?">What city were you born in?</option>
+                  <option value="What is your mother's maiden name?">What is your mother's maiden name?</option>
+                  <option value="What was the model of your first car?">What was the model of your first car?</option>
+                  <option value="What elementary school did you attend?">What elementary school did you attend?</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="input-group">
+              <div className="input-wrapper">
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="Security Answer"
+                  value={securityAnswer}
+                  onChange={(e) => setSecurityAnswer(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="input-group">
+              <div className="input-wrapper">
                 <Lock className="input-icon" size={18} />
                 <input
                   type={passwordInputType}
@@ -317,7 +376,28 @@ function Register() {
                   required
                 />
               </div>
-              {passwordStrengthDiv}
+              {password && (
+                <div className="password-requirements" style={{ fontSize: '12px', marginTop: '10px', color: '#666' }}>
+                  <p style={{ marginBottom: '5px', fontWeight: 'bold' }}>Password must contain:</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' }}>
+                    <div style={{ color: passwordCriteria.length ? 'green' : '#999' }}>
+                      {passwordCriteria.length ? '✓' : '○'} At least 8 characters
+                    </div>
+                    <div style={{ color: passwordCriteria.upper ? 'green' : '#999' }}>
+                      {passwordCriteria.upper ? '✓' : '○'} Uppercase letter
+                    </div>
+                    <div style={{ color: passwordCriteria.lower ? 'green' : '#999' }}>
+                      {passwordCriteria.lower ? '✓' : '○'} Lowercase letter
+                    </div>
+                    <div style={{ color: passwordCriteria.number ? 'green' : '#999' }}>
+                      {passwordCriteria.number ? '✓' : '○'} Number
+                    </div>
+                    <div style={{ color: passwordCriteria.special ? 'green' : '#999' }}>
+                      {passwordCriteria.special ? '✓' : '○'} Special character (!@#$%)
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="input-group">
@@ -364,9 +444,9 @@ function Register() {
           <p className="login-link">
             Already have an account? <Link to="/login">Login</Link>
           </p>
-        </div>
-      </div>
-    </div>
+        </div >
+      </div >
+    </div >
   );
 }
 

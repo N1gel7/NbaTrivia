@@ -8,7 +8,10 @@ import MVPSpeedChallenge from './pages/games/MVPSpeedChallenge';
 import NBAHistoryQuiz from './pages/games/NBAHistoryQuiz';
 import NBATrivia from './pages/games/NBATrivia';
 import GuessThePlayer from './pages/games/GuessThePlayer';
+
 import Profile from './pages/Profile';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import './App.css';
 
 function App() {
@@ -49,6 +52,18 @@ function App() {
           path="/register"
           element={
             isAuthenticated ? <Navigate to="/dashboard" /> : <Register onLogin={handleLogin} />
+          }
+        />
+        <Route
+          path="/forgot-password"
+          element={
+            isAuthenticated ? <Navigate to="/dashboard" /> : <ForgotPassword />
+          }
+        />
+        <Route
+          path="/reset-password"
+          element={
+            isAuthenticated ? <Navigate to="/dashboard" /> : <ResetPassword />
           }
         />
         <Route

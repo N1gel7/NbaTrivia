@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import GameHistory from '../components/GameHistory';
 import { useState, useEffect } from 'react';
 import Cookies from 'js-cookie';
 import { supabase } from '../supabaseClient';
@@ -17,11 +18,11 @@ function Profile({ onLogout }) {
   });
   const [gameModeStats, setGameModeStats] = useState({
     mvpSpeed: { best: 0, gamesPlayed: 0 },
-    history: { questionsAnswered: 0, totalQuestions: 0, accuracy: 0 },
-    trivia: { currentStreak: 0, gamesPlayed: 0 },
-    guessPlayer: { successRate: 0, gamesPlayed: 0 }
+    trivia: { gamesPlayed: 0 },
+    history: { accuracy: 0, gamesPlayed: 0 },
+    guessPlayer: { gamesPlayed: 0 }
   });
-  const [achievements, setAchievements] = useState([]);
+
   const [recentActivity, setRecentActivity] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -75,8 +76,8 @@ function Profile({ onLogout }) {
 
       if (globalStats) {
         setStats({
-          totalQuestions: globalStats.total_questions_answered || 0,
-          avgScore: globalStats.average_score || 0,
+          totalQuestions: globalStats.total_questions || 0,
+          avgScore: globalStats.avg_score || 0,
           totalPoints: globalStats.total_points || 0,
           hoursPlayed: globalStats.hours_played || 0
         });
@@ -105,6 +106,8 @@ function Profile({ onLogout }) {
           mvpSpeed: { ...prev.mvpSpeed, best: mvpBest }
         }));
       }
+
+
 
       setLoading(false);
 
@@ -199,10 +202,6 @@ function Profile({ onLogout }) {
             <div className="game-stat-card">
               <h3>NBA Trivia</h3>
               <div className="game-stat-item">
-                <span>Current Streak:</span>
-                <span className="stat-value-small">{gameModeStats.trivia.currentStreak} correct</span>
-              </div>
-              <div className="game-stat-item">
                 <span>Games Played:</span>
                 <span className="stat-value-small">{gameModeStats.trivia.gamesPlayed}</span>
               </div>
@@ -211,10 +210,6 @@ function Profile({ onLogout }) {
             <div className="game-stat-card">
               <h3>Guess the Player</h3>
               <div className="game-stat-item">
-                <span>Success Rate:</span>
-                <span className="stat-value-small">{gameModeStats.guessPlayer.successRate}%</span>
-              </div>
-              <div className="game-stat-item">
                 <span>Games Played:</span>
                 <span className="stat-value-small">{gameModeStats.guessPlayer.gamesPlayed}</span>
               </div>
@@ -222,39 +217,12 @@ function Profile({ onLogout }) {
           </div>
         </div>
 
-        {/* Achievements */}
-        <div className="achievements-section">
-          <h2 className="section-title">Achievements</h2>
-          <div className="achievements-grid">
-            {achievements.map((achievement) => (
-              <div
-                key={achievement.id}
-                className={`achievement-card ${achievement.earned ? 'earned' : 'locked'}`}
-              >
-                <div className="achievement-icon">{achievement.icon}</div>
-                <div className="achievement-name">{achievement.name}</div>
-                {!achievement.earned && (
-                  <div className="achievement-locked">🔒</div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+
 
         {/* Recent Activity */}
         <div className="activity-section">
-          <h2 className="section-title">Recent Activity</h2>
-          <div className="activity-timeline">
-            {recentActivity.map((activity, index) => (
-              <div key={index} className="activity-item">
-                <div className="activity-date">{activity.date}</div>
-                <div className="activity-content">
-                  <div className="activity-game">{activity.game}</div>
-                  <div className="activity-score">Score: {activity.score}</div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <h2 className="section-title">Recent Games</h2>
+          <GameHistory limit={10} />
         </div>
 
         {/* Back to Dashboard */}

@@ -42,7 +42,8 @@ function MVPSpeedChallenge() {
       // Construct full names and deduplicate
       const names = new Set();
       mvpData.forEach(p => {
-        names.add(`${p.first_name} ${p.last_name}`.toLowerCase());
+        const fullName = `${p.first_name} ${p.last_name}`.toLowerCase().trim().replace(/\s+/g, ' ');
+        names.add(fullName);
       });
       setAllMVPs(Array.from(names));
 
@@ -123,26 +124,94 @@ function MVPSpeedChallenge() {
 
   const endGame = async () => {
     setGameState('post');
-    if (score > personalBest) {
-      setPersonalBest(score);
 
-      // Save new record
-      const token = Cookies.get('auth_token');
-      if (token) {
-        const decoded = decodeJwt(token);
-        try {
-          await supabase
-            .from('user_game_mode_stats')
-            .upsert({
-              user_id: decoded.id,
-              game_mode: 'mvp_speed',
-              best_score: score,
-              games_played: 1,
-            }, { onConflict: 'user_id, game_mode' });
+    const token = Cookies.get('auth_token');
+    if (token) {
+      const decoded = decodeJwt(token);
+      try {
+        // 1. Update Game Mode Stats
+        const { data: existing } = await supabase
+          .from('user_game_mode_stats')
+          .select('*')
+          .eq('user_id', decoded.id)
+          .eq('game_mode', 'mvp_speed')
+          .single();
 
-        } catch (err) {
-          console.error('Error saving score:', err);
+        const newGamesPlayed = (existing?.games_played || 0) + 1;
+        const newBestScore = Math.max(existing?.best_score || 0, score);
+
+        if (score > personalBest) {
+          setPersonalBest(score);
         }
+
+        await supabase
+          .from('user_game_mode_stats')
+          .upsert({
+            user_id: decoded.id,
+            game_mode: 'mvp_speed',
+            best_score: newBestScore,
+            games_played: newGamesPlayed,
+          }, { onConflict: 'user_id, game_mode' });
+
+        // 2. Update Global Stats
+        const { data: global } = await supabase
+          .from('user_global_stats')
+          .select('*')
+          .eq('user_id', decoded.id)
+          .single();
+
+        const totalQuestions = (global?.total_questions || 0) + 1; // 1 game session
+        const currentPoints = (global?.total_points || 0) + score;
+
+        // Calculate average score (MVP count as percentage of total possible)
+        const totalMVPs = allMVPs.length || 1;
+        const percentageThisGame = Math.round((score / totalMVPs) * 100);
+        const previousAvg = global?.avg_score || 0;
+        const gamesPlayed = (global?.total_questions || 0) + 1;
+        const newAvgScore = Math.round(((previousAvg * (gamesPlayed - 1)) + percentageThisGame) / gamesPlayed);
+
+        // Calculate daily streak
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        let dailyStreak = 1;
+        if (global?.last_played) {
+          const lastPlayed = new Date(global.last_played);
+          const lastPlayedDate = new Date(lastPlayed.getFullYear(), lastPlayed.getMonth(), lastPlayed.getDate());
+          const daysDiff = Math.floor((today - lastPlayedDate) / (1000 * 60 * 60 * 24));
+
+          if (daysDiff === 0) {
+            dailyStreak = global.daily_streak || 1;
+          } else if (daysDiff === 1) {
+            dailyStreak = (global.daily_streak || 0) + 1;
+          }
+        }
+
+        await supabase
+          .from('user_global_stats')
+          .upsert({
+            user_id: decoded.id,
+            total_questions: totalQuestions,
+            total_points: currentPoints,
+            avg_score: newAvgScore,
+            daily_streak: dailyStreak,
+            last_played: now.toISOString()
+          }, { onConflict: 'user_id' });
+
+        // 3. Save Game Session
+        await supabase
+          .from('game_sessions')
+          .insert({
+            user_id: decoded.id,
+            game_mode: 'mvp_speed',
+            score: score,
+            played_at: new Date().toISOString()
+          });
+
+
+
+      } catch (err) {
+        console.error('Error saving score:', err);
       }
     }
   };
@@ -172,7 +241,8 @@ function MVPSpeedChallenge() {
             </div>
             <h1 className="ready-heading">Ready?</h1>
             <p className="instructions">
-              Type as many MVP winners as you can remember.<br />
+              Type the <strong>FULL NAME</strong> of as many MVP winners as you can remember.<br />
+              (e.g., "Michael Jordan", not just "Jordan")<br />
               Press Enter after each name.
             </p>
             <button className="btn btn-orange btn-large pulse" onClick={startGame}>
@@ -204,8 +274,8 @@ function MVPSpeedChallenge() {
             </div>
 
             <div className="score-display">
-              <div className="score-value">{score}</div>
-              <div className="score-label">MVPs Named</div>
+              <div className="score-value">{score} / {totalMVPs}</div>
+              <div className="score-label">Unique MVPs Found</div>
             </div>
 
             <div className="correct-answers">
@@ -221,9 +291,9 @@ function MVPSpeedChallenge() {
         {gameState === 'post' && (
           <div className="post-game-screen">
             <h1 className="time-up">Time's Up!</h1>
-            <div className="final-score">
-              <div className="score-number">{score}</div>
-              <div className="score-text">MVPs Named!</div>
+            <div className="stat-box">
+              <div className="stat-label">Progress</div>
+              <div className="stat-value">{score} / {totalMVPs}</div>
             </div>
             <div className="score-percentage">
               That's {percentage}% of all unique MVPs

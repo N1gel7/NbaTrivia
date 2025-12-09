@@ -21,6 +21,110 @@ function NBAHistoryQuiz() {
     fetchQuestions();
   }, []);
 
+  useEffect(() => {
+    if (gameComplete) {
+      saveGameStats();
+    }
+  }, [gameComplete]);
+
+  const decodeJwt = (token) => {
+    try {
+      return JSON.parse(atob(token.split('.')[1]));
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const saveGameStats = async () => {
+    const token = Cookies.get('auth_token');
+    if (!token) return;
+
+    const decoded = decodeJwt(token);
+    const userId = decoded?.id;
+    if (!userId) return;
+
+    try {
+      // 1. Update Game Mode Stats
+      const { data: existing } = await supabase
+        .from('user_game_mode_stats')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('game_mode', 'history')
+        .single();
+
+      const newGamesPlayed = (existing?.games_played || 0) + 1;
+      // You could track accuracy here if db supports it, for now just basic usage
+
+      await supabase
+        .from('user_game_mode_stats')
+        .upsert({
+          user_id: userId,
+          game_mode: 'history',
+          games_played: newGamesPlayed,
+          best_score: Math.max(existing?.best_score || 0, score)
+        }, { onConflict: 'user_id, game_mode' });
+
+
+      // 2. Update Global Stats
+      const { data: global } = await supabase
+        .from('user_global_stats')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+
+      const totalQuestions = (global?.total_questions || 0) + 10;
+      const currentPoints = (global?.total_points || 0) + (score * 100);
+
+      // Calculate average score (percentage based on correct answers)
+      const percentageThisGame = Math.round((score / 10) * 100); // score out of 10 questions
+      const previousAvg = global?.avg_score || 0;
+      const gamesPlayed = Math.floor((global?.total_questions || 0) / 10) + 1;
+      const newAvgScore = Math.round(((previousAvg * (gamesPlayed - 1)) + percentageThisGame) / gamesPlayed);
+
+      // Calculate daily streak based on last_played date
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+      let dailyStreak = 1;
+      if (global?.last_played) {
+        const lastPlayed = new Date(global.last_played);
+        const lastPlayedDate = new Date(lastPlayed.getFullYear(), lastPlayed.getMonth(), lastPlayed.getDate());
+        const daysDiff = Math.floor((today - lastPlayedDate) / (1000 * 60 * 60 * 24));
+
+        if (daysDiff === 0) {
+          dailyStreak = global.daily_streak || 1;
+        } else if (daysDiff === 1) {
+          dailyStreak = (global.daily_streak || 0) + 1;
+        }
+      }
+
+      await supabase
+        .from('user_global_stats')
+        .upsert({
+          user_id: userId,
+          total_questions: totalQuestions,
+          total_points: currentPoints,
+          avg_score: newAvgScore,
+          daily_streak: dailyStreak,
+          last_played: now.toISOString()
+        }, { onConflict: 'user_id' });
+
+      // 3. Save Game Session
+      await supabase
+        .from('game_sessions')
+        .insert({
+          user_id: userId,
+          game_mode: 'history',
+          score: score * 100,
+          played_at: new Date().toISOString()
+        });
+
+    } catch (err) {
+      console.error("Error saving stats:", err);
+    }
+  };
+
   async function fetchQuestions() {
     try {
       // Fetch history questions
@@ -88,78 +192,6 @@ function NBAHistoryQuiz() {
   const percentage = Math.round((score / questions.length) * 100);
   const progress = ((currentQuestion + 1) / questions.length) * 100;
 
-  const decodeJwt = (token) => {
-    try {
-      return JSON.parse(atob(token.split('.')[1]));
-    } catch (e) {
-      return null;
-    }
-  };
-
-  useEffect(() => {
-    if (gameComplete) {
-      saveGameStats();
-    }
-  }, [gameComplete]);
-
-  const saveGameStats = async () => {
-    const token = Cookies.get('auth_token');
-    if (!token) return;
-
-    const decoded = decodeJwt(token);
-    const userId = decoded?.id;
-    if (!userId) return;
-
-    try {
-      // 1. Update Game Mode Stats
-      const { data: existing } = await supabase
-        .from('user_game_mode_stats')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('game_mode', 'history')
-        .single();
-
-      const newGamesPlayed = (existing?.games_played || 0) + 1;
-      const newQuestionsAnswered = (existing?.questions_answered || 0) + 10;
-      // You could track accuracy here if db supports it, for now just basic usage
-
-      await supabase
-        .from('user_game_mode_stats')
-        .upsert({
-          user_id: userId,
-          game_mode: 'history',
-          games_played: newGamesPlayed,
-          questions_answered: newQuestionsAnswered,
-          best_score: Math.max(existing?.best_score || 0, score)
-        }, { onConflict: 'user_id, game_mode' });
-
-
-      // 2. Update Global Stats
-      const { data: global } = await supabase
-        .from('user_global_stats')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      const totalQuestions = (global?.total_questions || 0) + 10;
-      const currentPoints = (global?.total_points || 0) + (score * 100);
-      const newXp = (global?.xp || 0) + (score * 10); // Standard 10xp per correct answer assumption
-
-      await supabase
-        .from('user_global_stats')
-        .upsert({
-          user_id: userId,
-          total_questions: totalQuestions,
-          total_points: currentPoints,
-          xp: newXp,
-          last_active: new Date().toISOString()
-        }, { onConflict: 'user_id' });
-
-    } catch (err) {
-      console.error("Error saving stats:", err);
-    }
-  };
-
   if (gameComplete) {
     return (
       <div className="history-quiz-game">
@@ -186,13 +218,13 @@ function NBAHistoryQuiz() {
                       fill="none"
                       stroke="var(--green)"
                       strokeWidth="12"
-                      strokeDasharray={`${2 * Math.PI * 90}`}
-                      strokeDashoffset={`${2 * Math.PI * 90 * (1 - percentage / 100)}`}
+                      strokeDasharray={`${2 * Math.PI * 90} `}
+                      strokeDashoffset={`${2 * Math.PI * 90 * (1 - percentage / 100)} `}
                       strokeLinecap="round"
                       transform="rotate(-90 100 100)"
                     />
                   </svg>
-                  <div className="progress-text">
+                  <div className="circular-progress-text">
                     <div className="progress-percentage">{percentage}%</div>
                     <div className="progress-label">Correct</div>
                   </div>
@@ -213,13 +245,13 @@ function NBAHistoryQuiz() {
             <div className="questions-review">
               <h2>Question Review</h2>
               {answers.map((answer, index) => (
-                <div key={index} className={`review-item ${answer.isCorrect ? 'correct' : 'incorrect'}`}>
+                <div key={index} className={`review - item ${answer.isCorrect ? 'correct' : 'incorrect'} `}>
                   <div className="review-icon">
                     {answer.isCorrect ? '✓' : '✗'}
                   </div>
                   <div className="review-content">
                     <div className="review-question">{answer.question}</div>
-                    <div className={`review-answer ${answer.isCorrect ? 'correct' : 'incorrect'}`}>
+                    <div className={`review - answer ${answer.isCorrect ? 'correct' : 'incorrect'} `}>
                       {answer.isCorrect ? 'Correct!' : 'Incorrect'}
                     </div>
                   </div>
@@ -254,7 +286,7 @@ function NBAHistoryQuiz() {
           <div className="progress-bar">
             <div
               className="progress-fill"
-              style={{ width: `${progress}%` }}
+              style={{ width: `${progress}% ` }}
             ></div>
           </div>
           <div className="progress-text">
@@ -293,7 +325,7 @@ function NBAHistoryQuiz() {
 
           {showResult && (
             <div className="result-feedback">
-              <div className={`feedback-message ${selectedAnswer === question.correct ? 'correct' : 'incorrect'}`}>
+              <div className={`feedback - message ${selectedAnswer === question.correct ? 'correct' : 'incorrect'} `}>
                 {selectedAnswer === question.correct ? '✓ Correct!' : '✗ Incorrect'}
               </div>
               <div className="fact-box">

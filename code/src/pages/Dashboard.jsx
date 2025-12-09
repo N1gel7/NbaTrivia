@@ -17,9 +17,9 @@ function Dashboard({ onLogout }) {
 
   const [gameStats, setGameStats] = useState({
     mvpSpeed: { best: 0 },
-    history: { questionsAnswered: 0 },
-    trivia: { currentStreak: 0 },
-    guessPlayer: { successRate: 0 }
+    history: { best: 0 },
+    trivia: { best: 0 },
+    guessPlayer: { best: 0 }
   });
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);

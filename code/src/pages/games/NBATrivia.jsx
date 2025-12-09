@@ -22,6 +22,57 @@ function NBATrivia() {
     fetchQuestions();
   }, []);
 
+  useEffect(() => {
+    if (gameComplete) {
+      saveGameStats();
+    }
+  }, [gameComplete]);
+
+  const decodeJwt = (token) => {
+    try {
+      return JSON.parse(atob(token.split('.')[1]));
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const saveGameStats = async () => {
+    const token = Cookies.get('auth_token');
+    if (!token) return;
+
+    try {
+      const response = await fetch('/api/submit-game', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          token,
+          gameMode: 'trivia',
+          answers: answers.map(a => ({
+            questionId: a.questionId,
+            selectedAnswer: a.selectedAnswer
+          }))
+        })
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        console.error("Server validation failed:", errData);
+        return;
+      }
+
+      const result = await response.json();
+      console.log("Game submitted securely:", result);
+
+      // Optionally update local state with verified result if needed
+      // setTotalPoints(result.totalPoints);
+
+    } catch (err) {
+      console.error("Error saving stats:", err);
+    }
+  };
+
   async function fetchQuestions() {
     try {
       const { data, error } = await supabase
@@ -33,6 +84,7 @@ function NBATrivia() {
         console.error('Error fetching questions:', error);
       } else {
         const shuffled = data.sort(() => Math.random() - 0.5);
+        // Ensure ID is present. It should be since select('*') includes it.
         setQuestions(shuffled.slice(0, 10));
       }
       setLoading(false);
@@ -66,6 +118,8 @@ function NBATrivia() {
     setAnswers([
       ...answers,
       {
+        questionId: question.id,
+        selectedAnswer: index,
         question: question.question,
         selected: index,
         correct: question.correct,
@@ -96,80 +150,6 @@ function NBATrivia() {
 
   const percentage = Math.round((score / questions.length) * 100);
   const progress = ((currentQuestion + 1) / questions.length) * 100;
-
-  const decodeJwt = (token) => {
-    try {
-      return JSON.parse(atob(token.split('.')[1]));
-    } catch (e) {
-      return null;
-    }
-  };
-
-  useEffect(() => {
-    if (gameComplete) {
-      saveGameStats();
-    }
-  }, [gameComplete]);
-
-  const saveGameStats = async () => {
-    const token = Cookies.get('auth_token');
-    if (!token) return;
-
-    const decoded = decodeJwt(token);
-    const userId = decoded?.id;
-    if (!userId) return;
-
-    try {
-      // 1. Update Game Mode Stats for Trivia
-      const { data: existing } = await supabase
-        .from('user_game_mode_stats')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('game_mode', 'TSrivia')
-        .single();
-
-      const currentStreak = (existing?.current_streak || 0);
-      const newStreak = score === questions.length ? currentStreak + 1 : 0;
-
-      const newGamesPlayed = (existing?.games_played || 0) + 1;
-      const updatedStreak = score >= 5 ? currentStreak + 1 : 0;
-
-      await supabase
-        .from('user_game_mode_stats')
-        .upsert({
-          user_id: userId,
-          game_mode: 'trivia',
-          games_played: newGamesPlayed,
-          current_streak: updatedStreak,
-          best_score: Math.max(existing?.best_score || 0, totalPoints)
-        }, { onConflict: 'user_id, game_mode' });
-
-
-      // 2. Update Global Stats
-      const { data: global } = await supabase
-        .from('user_global_stats')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      const totalQuestions = (global?.total_questions || 0) + 10;
-      const currentPoints = (global?.total_points || 0) + totalPoints; // Use calculated totalPoints
-      const newXp = (global?.xp || 0) + score * 10;
-
-      await supabase
-        .from('user_global_stats')
-        .upsert({
-          user_id: userId,
-          total_questions: totalQuestions,
-          total_points: currentPoints,
-          xp: newXp,
-          last_active: new Date().toISOString()
-        }, { onConflict: 'user_id' });
-
-    } catch (err) {
-      console.error("Error saving stats:", err);
-    }
-  };
 
   if (gameComplete) {
     return (

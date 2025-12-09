@@ -22,6 +22,109 @@ function GuessThePlayer() {
     fetchGameData();
   }, []);
 
+  useEffect(() => {
+    if (gameComplete) {
+      saveGameStats();
+    }
+  }, [gameComplete]);
+
+  const decodeJwt = (token) => {
+    try {
+      return JSON.parse(atob(token.split('.')[1]));
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const saveGameStats = async () => {
+    const token = Cookies.get('auth_token');
+    if (!token) return;
+
+    const decoded = decodeJwt(token);
+    const userId = decoded?.id;
+    if (!userId) return;
+
+    try {
+      // 1. Update Game Mode Stats
+      const { data: existing } = await supabase
+        .from('user_game_mode_stats')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('game_mode', 'guess_player')
+        .single();
+
+      const newGamesPlayed = (existing?.games_played || 0) + 1;
+      // Calculate success rate: (total_score / possible_score) * 100? Or just wins? 
+      // Let's use score / max possible score logic or just store raw points?
+
+      await supabase
+        .from('user_game_mode_stats')
+        .upsert({
+          user_id: userId,
+          game_mode: 'guess_player',
+          games_played: newGamesPlayed,
+          best_score: Math.max(existing?.best_score || 0, score)
+        }, { onConflict: 'user_id, game_mode' });
+
+      // 2. Update Global Stats
+      const { data: global } = await supabase
+        .from('user_global_stats')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      const totalQuestions = (global?.total_questions || 0) + 5; // 5 players
+      const currentPoints = (global?.total_points || 0) + score;
+
+      // Calculate average score (score out of 2500 max)
+      const percentageThisGame = Math.round((score / 2500) * 100);
+      const previousAvg = global?.avg_score || 0;
+      const gamesPlayed = Math.floor((global?.total_questions || 0) / 5) + 1;
+      const newAvgScore = Math.round(((previousAvg * (gamesPlayed - 1)) + percentageThisGame) / gamesPlayed);
+
+      // Calculate daily streak based on last_played date
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+      let dailyStreak = 1;
+      if (global?.last_played) {
+        const lastPlayed = new Date(global.last_played);
+        const lastPlayedDate = new Date(lastPlayed.getFullYear(), lastPlayed.getMonth(), lastPlayed.getDate());
+        const daysDiff = Math.floor((today - lastPlayedDate) / (1000 * 60 * 60 * 24));
+
+        if (daysDiff === 0) {
+          dailyStreak = global.daily_streak || 1;
+        } else if (daysDiff === 1) {
+          dailyStreak = (global.daily_streak || 0) + 1;
+        }
+      }
+
+      await supabase
+        .from('user_global_stats')
+        .upsert({
+          user_id: userId,
+          total_questions: totalQuestions,
+          total_points: currentPoints,
+          avg_score: newAvgScore,
+          daily_streak: dailyStreak,
+          last_played: now.toISOString()
+        }, { onConflict: 'user_id' });
+
+      // 3. Save Game Session
+      await supabase
+        .from('game_sessions')
+        .insert({
+          user_id: userId,
+          game_mode: 'guess_player',
+          score: score,
+          played_at: new Date().toISOString()
+        });
+
+    } catch (err) {
+      console.error("Error saving stats:", err);
+    }
+  };
+
   async function fetchGameData() {
     try {
       const { data, error } = await supabase
@@ -36,9 +139,9 @@ function GuessThePlayer() {
         const selected = shuffled.slice(0, 5);
         const formatted = selected.map(p => {
           return {
-            player: p.first_name + ' ' + p.last_name,
-            clues: p.clues,
-            stats: p.stats
+            player: (p.first_name || '') + ' ' + (p.last_name || ''),
+            clues: Array.isArray(p.clues) ? p.clues : [],
+            stats: p.stats || 'No stats available'
           };
         });
 
@@ -121,85 +224,6 @@ function GuessThePlayer() {
     navigate('/login');
   };
 
-  const decodeJwt = (token) => {
-    try {
-      return JSON.parse(atob(token.split('.')[1]));
-    } catch (e) {
-      return null;
-    }
-  };
-
-  useEffect(() => {
-    if (gameComplete) {
-      saveGameStats();
-    }
-  }, [gameComplete]);
-
-  const saveGameStats = async () => {
-    const token = Cookies.get('auth_token');
-    if (!token) return;
-
-    const decoded = decodeJwt(token);
-    const userId = decoded?.id;
-    if (!userId) return;
-
-    try {
-      // 1. Update Game Mode Stats
-      const { data: existing } = await supabase
-        .from('user_game_mode_stats')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('game_mode', 'guess_player')
-        .single();
-
-      const newGamesPlayed = (existing?.games_played || 0) + 1;
-      // Calculate success rate: (total_score / possible_score) * 100? Or just wins? 
-      // Let's use score / max possible score logic or just store raw points?
-      // Dashboard expects 'successRate'. Let's simplisticly say score > 0 is success for now or calculate roughly.
-      // Better: let's just update 'success_rate' to be the average accuracy of this session
-      // Max score per player is 500. 5 players = 2500 max.
-      // success_rate = (score / 2500) * 100
-
-      const sessionAccuracy = Math.round((score / 2500) * 100);
-      const oldRate = existing?.success_rate || 0;
-      // Running average roughly
-      const newRate = Math.round((oldRate * (newGamesPlayed - 1) + sessionAccuracy) / newGamesPlayed);
-
-      await supabase
-        .from('user_game_mode_stats')
-        .upsert({
-          user_id: userId,
-          game_mode: 'guess_player',
-          games_played: newGamesPlayed,
-          success_rate: newRate
-        }, { onConflict: 'user_id, game_mode' });
-
-      // 2. Update Global Stats
-      const { data: global } = await supabase
-        .from('user_global_stats')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      const totalQuestions = (global?.total_questions || 0) + 5; // 5 players
-      const currentPoints = (global?.total_points || 0) + score;
-      const newXp = (global?.xp || 0) + (score / 10);
-
-      await supabase
-        .from('user_global_stats')
-        .upsert({
-          user_id: userId,
-          total_questions: totalQuestions,
-          total_points: currentPoints,
-          xp: newXp,
-          last_active: new Date().toISOString()
-        }, { onConflict: 'user_id' });
-
-    } catch (err) {
-      console.error("Error saving stats:", err);
-    }
-  };
-
   if (gameComplete) {
     return (
       <div className="guess-player-game">
@@ -215,7 +239,7 @@ function GuessThePlayer() {
             <div className="game-history">
               <h2>Your Guesses</h2>
               {gameHistory.map((item, index) => (
-                <div key={index} className={`history-item ${item.correct ? 'correct' : 'incorrect'}`}>
+                <div key={index} className={`history - item ${item.correct ? 'correct' : 'incorrect'} `}>
                   <div className="history-player">
                     <span className="player-icon">{item.correct ? '✓' : '✗'}</span>
                     <span className="player-name">{item.player}</span>
@@ -312,7 +336,7 @@ function GuessThePlayer() {
           {currentPlayer.clues.map((_, index) => (
             <div
               key={index}
-              className={`clue-dot ${index <= currentClueIndex ? 'revealed' : ''}`}
+              className={`clue - dot ${index <= currentClueIndex ? 'revealed' : ''} `}
             ></div>
           ))}
         </div>

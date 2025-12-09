@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, Lock, Eye, EyeOff } from 'lucide-react';
 import Cookies from 'js-cookie';
@@ -10,11 +10,39 @@ function Login(props) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [lockoutEnd, setLockoutEnd] = useState(null);
+  const [timeLeft, setTimeLeft] = useState('');
 
   const navigate = useNavigate();
+
+  // Timer Effect
+  useEffect(() => {
+    if (!lockoutEnd) {
+      setTimeLeft('');
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const now = new Date();
+      const end = new Date(lockoutEnd);
+      const diff = end - now;
+
+      if (diff <= 0) {
+        setLockoutEnd(null);
+        setError('');
+        setTimeLeft('');
+        clearInterval(interval);
+      } else {
+        const minutes = Math.floor(diff / 60000);
+        const seconds = Math.floor((diff % 60000) / 1000);
+        setTimeLeft(`${minutes}:${seconds.toString().padStart(2, '0')}`);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [lockoutEnd]);
 
   function canLogin() {
     const lastAttempt = localStorage.getItem('last_login_attempt');
@@ -76,6 +104,10 @@ function Login(props) {
             errorMsg = msg;
           }
 
+          if (result.data.lockoutUntil) {
+            setLockoutEnd(result.data.lockoutUntil);
+          }
+
           // Throw simple error string to catch block
           throw new Error(errorMsg);
         }
@@ -83,10 +115,7 @@ function Login(props) {
         const token = result.data.token;
 
         // Calculate expires
-        let expiry = 1;
-        if (rememberMe === true) {
-          expiry = 7;
-        }
+        const expiry = 1;
 
         Cookies.set('auth_token', token, { expires: expiry });
 
@@ -191,19 +220,17 @@ function Login(props) {
               </div>
             </div>
 
+
+
             <div className="form-actions">
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={function (e) { setRememberMe(e.target.checked); }}
-                />
-                <span>Remember for 30 days</span>
-              </label>
-              <a href="#" className="forgot-password">Forgot password?</a>
+              <Link to="/forgot-password" className="forgot-password">Forgot password?</Link>
             </div>
 
-            {errorMessageDiv}
+            {lockoutEnd && (
+              <div className="lockout-timer" style={{ color: '#ef4444', textAlign: 'center', marginTop: '10px', fontWeight: 'bold' }}>
+                Try again in: {timeLeft}
+              </div>
+            )}
 
             <button
               type="submit"
