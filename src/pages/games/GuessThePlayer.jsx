@@ -177,7 +177,7 @@ function GuessThePlayer() {
           {revealed && (
             <div className="reveal-section">
               <div className="player-reveal">
-                <div className="player-icon-large">{currentPlayer.image}</div>
+
                 <div className="player-name-large">{currentPlayer.player}</div>
                 <div className="player-stats">{currentPlayer.stats}</div>
               </div>

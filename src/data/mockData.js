@@ -185,7 +185,7 @@ export const playerClues = [
       "I've played for 3 different teams",
       "I've won MVP 4 times"
     ],
-    image: "🏀",
+
     stats: "4x NBA Champion, 4x MVP, 19x All-Star"
   },
   {
@@ -197,7 +197,7 @@ export const playerClues = [
       "I played for 2 teams in my career",
       "I won MVP 5 times"
     ],
-    image: "🏀",
+
     stats: "6x NBA Champion, 5x MVP, 14x All-Star"
   },
   {
@@ -209,7 +209,7 @@ export const playerClues = [
       "I played for only 1 team",
       "I won MVP once"
     ],
-    image: "🏀",
+
     stats: "5x NBA Champion, 1x MVP, 18x All-Star"
   },
   {
@@ -221,7 +221,7 @@ export const playerClues = [
       "I've played for 1 team",
       "I've won MVP twice"
     ],
-    image: "🏀",
+
     stats: "4x NBA Champion, 2x MVP, 9x All-Star"
   },
   {
@@ -233,7 +233,7 @@ export const playerClues = [
       "I played for only 1 team",
       "I won MVP 3 times"
     ],
-    image: "🏀",
+
     stats: "5x NBA Champion, 3x MVP, 12x All-Star"
   }
 ];
