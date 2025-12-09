@@ -14,7 +14,7 @@ function Dashboard({ onLogout }) {
     avgScore: 0,
     currentRank: 0
   });
-  // Default values matching original mock structure for safety
+
   const [gameStats, setGameStats] = useState({
     mvpSpeed: { best: 0 },
     history: { questionsAnswered: 0 },

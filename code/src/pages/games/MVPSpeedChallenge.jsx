@@ -91,7 +91,7 @@ function MVPSpeedChallenge() {
   };
 
   const handleInputChange = (e) => {
-    const value = e.target.value; // Don't trim while typing
+    const value = e.target.value;
     setInput(value);
   };
 
@@ -131,15 +131,13 @@ function MVPSpeedChallenge() {
       if (token) {
         const decoded = jwt.decode(token);
         try {
-          // Check if row exists first (upsert logic in Supabase via conflict)
           await supabase
             .from('user_game_mode_stats')
             .upsert({
               user_id: decoded.id,
               game_mode: 'mvp_speed',
               best_score: score,
-              games_played: 1, // Start logic usually increments this, simplified here
-              // current_streak... logic omitted for simplicity
+              games_played: 1,
             }, { onConflict: 'user_id, game_mode' });
 
         } catch (err) {

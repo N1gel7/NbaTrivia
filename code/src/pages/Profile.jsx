@@ -1,11 +1,122 @@
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import { currentUser } from '../data/mockData';
+import { useState, useEffect } from 'react';
+import Cookies from 'js-cookie';
+import { supabase } from '../supabaseClient';
 import './Profile.css';
 
 function Profile({ onLogout }) {
   const navigate = useNavigate();
-  const { stats, gameModeStats, achievements, recentActivity } = currentUser;
+
+  const [user, setUser] = useState({ username: '', email: '', joinDate: '' });
+  const [stats, setStats] = useState({
+    totalQuestions: 0,
+    avgScore: 0,
+    totalPoints: 0,
+    hoursPlayed: 0
+  });
+  const [gameModeStats, setGameModeStats] = useState({
+    mvpSpeed: { best: 0, gamesPlayed: 0 },
+    history: { questionsAnswered: 0, totalQuestions: 0, accuracy: 0 },
+    trivia: { currentStreak: 0, gamesPlayed: 0 },
+    guessPlayer: { successRate: 0, gamesPlayed: 0 }
+  });
+  const [achievements, setAchievements] = useState([]);
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchProfileData();
+  }, []);
+
+  const decodeJwt = (token) => {
+    try {
+      return JSON.parse(atob(token.split('.')[1]));
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const fetchProfileData = async () => {
+    try {
+      const token = Cookies.get('auth_token');
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+
+      const decoded = decodeJwt(token);
+      if (!decoded) {
+        navigate('/login');
+        return;
+      }
+      const userId = decoded.id;
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (userData) {
+        setUser({
+          username: userData.username,
+          email: userData.email,
+          joinDate: new Date(userData.created_at).toLocaleDateString()
+        });
+      }
+
+
+      const { data: globalStats } = await supabase
+        .from('user_global_stats')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (globalStats) {
+        setStats({
+          totalQuestions: globalStats.total_questions_answered || 0,
+          avgScore: globalStats.average_score || 0,
+          totalPoints: globalStats.total_points || 0,
+          hoursPlayed: globalStats.hours_played || 0
+        });
+      }
+
+
+      const { data: modeStats } = await supabase
+        .from('user_game_mode_stats')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (modeStats) {
+        // Simple mapping manually
+        let mvpBest = 0;
+        let historyAcc = 0;
+
+        modeStats.forEach(mode => {
+          if (mode.game_mode === 'mvp_speed') {
+            mvpBest = mode.best_score;
+          }
+          // Add more mappings here simply
+        });
+
+        setGameModeStats(prev => ({
+          ...prev,
+          mvpSpeed: { ...prev.mvpSpeed, best: mvpBest }
+        }));
+      }
+
+      setLoading(false);
+
+    } catch (error) {
+      console.error('Error loading profile:', error);
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="loading-screen">Loading Profile...</div>;
+  }
 
   return (
     <div className="profile-page">
@@ -16,9 +127,9 @@ function Profile({ onLogout }) {
         <div className="profile-header">
           <div className="profile-avatar-large"></div>
           <div className="profile-info">
-            <h1>{currentUser.username}</h1>
-            <p className="profile-email">{currentUser.email}</p>
-            <p className="profile-join-date">Member since {currentUser.joinDate}</p>
+            <h1>{user.username}</h1>
+            <p className="profile-email">{user.email}</p>
+            <p className="profile-join-date">Member since {user.joinDate}</p>
           </div>
         </div>
 

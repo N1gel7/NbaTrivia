@@ -23,43 +23,32 @@
   --gray: #6c757d;
   --light-gray: #e9ecef;
 
-  /* Functional Token Mapping (Light Theme Adaptation) */
+
   --bg-dark: var(--cream);
-  /* Mapped to cream for light mode base */
   --bg-card: rgba(255, 255, 255, 0.5);
-  /* More transparent/softer */
   --bg-card-hover: rgba(255, 255, 255, 0.7);
 
   --primary-gold: var(--navy-blue);
-  /* Primary action color becomes Navy */
   --primary-gold-dim: var(--dark-navy);
-
-  /* Accents - Desaturated for "Calm" look */
   --accent-blue: #3b82f6;
   --accent-purple: #8b5cf6;
   --accent-red: #f43f5e;
 
-  /* Text */
+
   --text-primary: var(--dark-navy);
   --text-secondary: #64748b;
-  /* Cool gray for softness */
   --text-muted: #94a3b8;
-
-  /* Glass Effects */
   --glass-border: rgba(255, 255, 255, 0.4);
   --glass-highlight: rgba(255, 255, 255, 0.6);
 
   --shadow-sm: 0 4px 6px -1px rgba(29, 66, 138, 0.05), 0 2px 4px -1px rgba(29, 66, 138, 0.03);
   --shadow-lg: 0 20px 25px -5px rgba(29, 66, 138, 0.1), 0 8px 10px -6px rgba(29, 66, 138, 0.05);
-  /* Deeper shadow */
   --shadow-glow: 0 0 15px rgba(29, 66, 138, 0.05);
-  /* Softer glow */
 }
 
 body {
   font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   background-color: #f3f4f6;
-  /* Softer gray-ish background to reduce white glare */
   background-image: linear-gradient(135deg, #fdfbf7 0%, #f3f4f6 100%);
   color: var(--text-primary);
   min-height: 100vh;
@@ -71,7 +60,7 @@ body {
   min-height: 100vh;
 }
 
-/* Typography */
+
 h1,
 h2,
 h3,
@@ -98,7 +87,7 @@ h6 {
   -webkit-text-fill-color: transparent;
 }
 
-/* Common Animations */
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -129,7 +118,7 @@ h6 {
   animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Glassmorphism Utilities */
+
 .glass-panel {
   background: var(--bg-card);
   backdrop-filter: blur(12px);
@@ -138,7 +127,7 @@ h6 {
   box-shadow: var(--shadow-lg);
 }
 
-/* Button Resets & Base Styles */
+
 button {
   font-family: inherit;
 }

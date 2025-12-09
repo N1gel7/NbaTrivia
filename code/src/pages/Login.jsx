@@ -4,66 +4,130 @@ import { User, Lock, Eye, EyeOff } from 'lucide-react';
 import Cookies from 'js-cookie';
 import './Login.css';
 
+function Login(props) {
+  const onLogin = props.onLogin;
 
-
-function Login({ onLogin }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
   const navigate = useNavigate();
 
-  const canLogin = () => {
+  function canLogin() {
     const lastAttempt = localStorage.getItem('last_login_attempt');
-    if (!lastAttempt) return true;
+    if (lastAttempt === null) {
+      return true;
+    }
 
-    // Lenient rate limit: 1 sec delay between attempts
-    const timeSince = Date.now() - parseInt(lastAttempt);
-    return timeSince > 1000;
-  };
+    const now = Date.now();
+    const last = parseInt(lastAttempt);
+    const timeSince = now - last;
 
-  const handleSubmit = async (e) => {
+    if (timeSince > 1000) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  function handleSubmit(e) {
     e.preventDefault();
     setError('');
 
-    if (!canLogin()) {
+    if (canLogin() === false) {
       setError('Please wait a moment before trying again.');
       return;
     }
 
-    localStorage.setItem('last_login_attempt', Date.now().toString());
+    const nowStr = Date.now().toString();
+    localStorage.setItem('last_login_attempt', nowStr);
+
     setLoading(true);
 
-    try {
-      // Call Vercel API
-      const response = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+    const bodyData = {
+      username: username,
+      password: password
+    };
+
+    fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(bodyData)
+    })
+      .then(function (response) {
+        return response.json().then(function (data) {
+          // We return an object with both response status and data
+          const result = {
+            ok: response.ok,
+            data: data
+          };
+          return result;
+        });
+      })
+      .then(function (result) {
+        if (result.ok === false) {
+          const msg = result.data.message;
+
+          let errorMsg = 'Login failed';
+          if (msg !== undefined) {
+            errorMsg = msg;
+          }
+
+          // Throw simple error string to catch block
+          throw new Error(errorMsg);
+        }
+
+        const token = result.data.token;
+
+        // Calculate expires
+        let expiry = 1;
+        if (rememberMe === true) {
+          expiry = 7;
+        }
+
+        Cookies.set('auth_token', token, { expires: expiry });
+
+        onLogin(); // Prop function
+        navigate('/dashboard');
+        setLoading(false);
+      })
+      .catch(function (err) {
+        console.error('Login error:', err);
+        let errMsg = 'Failed to login';
+        if (err.message) {
+          errMsg = err.message;
+        }
+        setError(errMsg);
+        setLoading(false);
       });
+  }
 
-      const data = await response.json();
+  // Password Input Type logic
+  let passwordInputType = 'password';
+  if (showPassword === true) {
+    passwordInputType = 'text';
+  }
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Login failed');
-      }
+  // Password Icon Logic
+  let passwordIcon = <Eye size={18} />;
+  if (showPassword === true) {
+    passwordIcon = <EyeOff size={18} />;
+  }
 
-      // 4. Set Cookie (Token is now returned from API)
-      Cookies.set('auth_token', data.token, { expires: rememberMe ? 7 : 1 });
+  // Button Text Logic
+  let buttonText = 'Sign In';
+  if (loading === true) {
+    buttonText = 'Logging in...';
+  }
 
-      // 5. Success
-      onLogin();
-      navigate('/dashboard');
-
-    } catch (err) {
-      console.error('Login error:', err);
-      setError(err.message || 'Failed to login');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Error Message Logic
+  let errorMessageDiv = null;
+  if (error !== '') {
+    errorMessageDiv = <div className="error-message">{error}</div>;
+  }
 
   return (
     <div className="login-container">
@@ -99,7 +163,7 @@ function Login({ onLogin }) {
                   className="input"
                   placeholder="Enter your username"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={function (e) { setUsername(e.target.value); }}
                   required
                 />
               </div>
@@ -110,19 +174,19 @@ function Login({ onLogin }) {
               <div className="input-wrapper">
                 <Lock className="input-icon" size={18} />
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  type={passwordInputType}
                   className="input"
                   placeholder="••••••••"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={function (e) { setPassword(e.target.value); }}
                   required
                 />
                 <button
                   type="button"
                   className="password-toggle"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={function () { setShowPassword(!showPassword); }}
                 >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {passwordIcon}
                 </button>
               </div>
             </div>
@@ -132,21 +196,21 @@ function Login({ onLogin }) {
                 <input
                   type="checkbox"
                   checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
+                  onChange={function (e) { setRememberMe(e.target.checked); }}
                 />
                 <span>Remember for 30 days</span>
               </label>
               <a href="#" className="forgot-password">Forgot password?</a>
             </div>
 
-            {error && <div className="error-message">{error}</div>}
+            {errorMessageDiv}
 
             <button
               type="submit"
               className="btn btn-primary btn-full"
               disabled={loading}
             >
-              {loading ? 'Logging in...' : 'Sign In'}
+              {buttonText}
             </button>
           </form>
 

@@ -1,41 +1,76 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
-import { historyQuestions } from '../../data/mockData';
-import './NBAHistoryQuiz.css';
+import { supabase } from '../../supabaseClient';
+import './NBATrivia.css';
 
-function NBAHistoryQuiz() {
+function NBATrivia() {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [showResult, setShowResult] = useState(false);
   const [score, setScore] = useState(0);
+  const [totalPoints, setTotalPoints] = useState(0);
   const [answers, setAnswers] = useState([]);
   const [gameComplete, setGameComplete] = useState(false);
   const navigate = useNavigate();
 
-  // Shuffle questions
-  const [questions] = useState(() => {
-    const shuffled = [...historyQuestions].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, 10);
-  });
+  const [questions, setQuestions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchQuestions();
+  }, []);
+
+  async function fetchQuestions() {
+    try {
+      const { data, error } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('category', 'trivia');
+
+      if (error) {
+        console.error('Error fetching questions:', error);
+      } else {
+        const shuffled = data.sort(() => Math.random() - 0.5);
+        setQuestions(shuffled.slice(0, 10));
+      }
+      setLoading(false);
+    } catch (err) {
+      console.error(err);
+      setLoading(false);
+    }
+  }
+
+  if (loading) {
+    return <div className="loading-screen">Loading Trivia...</div>;
+  }
+
+  if (questions.length === 0) {
+    return <div className="error-message">No questions found.</div>;
+  }
 
   const handleAnswerSelect = (index) => {
     if (showResult) return;
     setSelectedAnswer(index);
     setShowResult(true);
 
-    const isCorrect = index === questions[currentQuestion].correct;
+    const question = questions[currentQuestion];
+    const isCorrect = index === question.correct;
+
     if (isCorrect) {
       setScore(score + 1);
+      setTotalPoints(totalPoints + question.points);
     }
 
     setAnswers([
       ...answers,
       {
-        question: questions[currentQuestion].question,
+        question: question.question,
         selected: index,
-        correct: questions[currentQuestion].correct,
-        isCorrect
+        correct: question.correct,
+        isCorrect,
+        points: isCorrect ? question.points : 0,
+        difficulty: question.difficulty
       }
     ]);
   };
@@ -54,65 +89,49 @@ function NBAHistoryQuiz() {
     navigate('/login');
   };
 
+  const getDifficultyIcons = (difficulty) => {
+    return '🏀'.repeat(difficulty);
+  };
+
   const percentage = Math.round((score / questions.length) * 100);
   const progress = ((currentQuestion + 1) / questions.length) * 100;
 
   if (gameComplete) {
     return (
-      <div className="history-quiz-game">
+      <div className="trivia-game">
         <Navbar onLogout={handleLogout} />
         <div className="game-container">
           <div className="results-screen">
-            <h1>Quiz Complete!</h1>
+            <h1>Trivia Complete!</h1>
             <div className="results-summary">
-              <div className="circular-progress">
-                <div className="progress-circle">
-                  <svg width="200" height="200">
-                    <circle
-                      cx="100"
-                      cy="100"
-                      r="90"
-                      fill="none"
-                      stroke="var(--light-gray)"
-                      strokeWidth="12"
-                    />
-                    <circle
-                      cx="100"
-                      cy="100"
-                      r="90"
-                      fill="none"
-                      stroke="var(--green)"
-                      strokeWidth="12"
-                      strokeDasharray={`${2 * Math.PI * 90}`}
-                      strokeDashoffset={`${2 * Math.PI * 90 * (1 - percentage / 100)}`}
-                      strokeLinecap="round"
-                      transform="rotate(-90 100 100)"
-                    />
-                  </svg>
-                  <div className="progress-text">
-                    <div className="progress-percentage">{percentage}%</div>
-                    <div className="progress-label">Correct</div>
-                  </div>
-                </div>
+              <div className="score-card">
+                <div className="score-main">{score}/{questions.length}</div>
+                <div className="score-label">Correct Answers</div>
               </div>
-              <div className="score-details">
-                <div className="score-item">
-                  <span className="score-label">Score:</span>
-                  <span className="score-value">{score}/{questions.length}</span>
-                </div>
-                <div className="score-item">
-                  <span className="score-label">Points Earned:</span>
-                  <span className="score-value">{score * 100}</span>
-                </div>
+              <div className="score-card">
+                <div className="score-main">{totalPoints}</div>
+                <div className="score-label">Total Points</div>
+              </div>
+              <div className="score-card">
+                <div className="score-main">{percentage}%</div>
+                <div className="score-label">Accuracy</div>
               </div>
             </div>
 
             <div className="questions-review">
               <h2>Question Review</h2>
               {answers.map((answer, index) => (
-                <div key={index} className={`review-item ${answer.isCorrect ? 'correct' : 'incorrect'}`}>
-                  <div className="review-icon">
-                    {answer.isCorrect ? '✓' : '✗'}
+                <div key={index} className="review-item">
+                  <div className="review-header">
+                    <div className={`review-icon ${answer.isCorrect ? 'correct' : 'incorrect'}`}>
+                      {answer.isCorrect ? '✓' : '✗'}
+                    </div>
+                    <div className="review-difficulty">
+                      {getDifficultyIcons(answer.difficulty)}
+                    </div>
+                    {answer.isCorrect && (
+                      <div className="review-points">+{answer.points} pts</div>
+                    )}
                   </div>
                   <div className="review-content">
                     <div className="review-question">{answer.question}</div>
@@ -144,7 +163,7 @@ function NBAHistoryQuiz() {
   const question = questions[currentQuestion];
 
   return (
-    <div className="history-quiz-game">
+    <div className="trivia-game">
       <Navbar onLogout={handleLogout} />
       <div className="game-container">
         <div className="progress-bar-container">
@@ -154,12 +173,20 @@ function NBAHistoryQuiz() {
               style={{ width: `${progress}%` }}
             ></div>
           </div>
-          <div className="progress-text">
-            Question {currentQuestion + 1} of {questions.length}
+          <div className="progress-info">
+            <span>Question {currentQuestion + 1} of {questions.length}</span>
+            <span className="points-display">Points: {totalPoints}</span>
           </div>
         </div>
 
         <div className="question-card">
+          <div className="question-header">
+            <div className="difficulty-badge">
+              {getDifficultyIcons(question.difficulty)}
+            </div>
+            <div className="points-badge">{question.points} points</div>
+          </div>
+
           <h2 className="question-text">{question.question}</h2>
 
           <div className="answers-grid">
@@ -191,10 +218,9 @@ function NBAHistoryQuiz() {
           {showResult && (
             <div className="result-feedback">
               <div className={`feedback-message ${selectedAnswer === question.correct ? 'correct' : 'incorrect'}`}>
-                {selectedAnswer === question.correct ? '✓ Correct!' : '✗ Incorrect'}
-              </div>
-              <div className="fact-box">
-                <strong>Did you know?</strong> {question.fact}
+                {selectedAnswer === question.correct
+                  ? `✓ Correct! +${question.points} points`
+                  : '✗ Incorrect'}
               </div>
               <button className="btn btn-primary btn-full" onClick={handleNext}>
                 {currentQuestion < questions.length - 1 ? 'Next Question' : 'View Results'}
@@ -207,5 +233,5 @@ function NBAHistoryQuiz() {
   );
 }
 
-export default NBAHistoryQuiz;
+export default NBATrivia;
 

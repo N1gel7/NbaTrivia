@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
-import { playerClues } from '../../data/mockData';
+import { supabase } from '../../supabaseClient';
 import './GuessThePlayer.css';
 
 function GuessThePlayer() {
@@ -14,9 +14,49 @@ function GuessThePlayer() {
   const [gameHistory, setGameHistory] = useState([]);
   const navigate = useNavigate();
 
-  const [players] = useState(() => {
-    return [...playerClues].sort(() => Math.random() - 0.5).slice(0, 5);
-  });
+  const [players, setPlayers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchGameData();
+  }, []);
+
+  async function fetchGameData() {
+    try {
+      const { data, error } = await supabase
+        .from('guess_player_questions')
+        .select('*');
+
+      if (error) {
+        console.error('Error fetching players:', error);
+      } else {
+        // Randomize
+        const shuffled = data.sort(() => Math.random() - 0.5);
+        const selected = shuffled.slice(0, 5);
+        const formatted = selected.map(p => {
+          return {
+            player: p.first_name + ' ' + p.last_name,
+            clues: p.clues,
+            stats: p.stats
+          };
+        });
+
+        setPlayers(formatted);
+      }
+      setLoading(false);
+    } catch (err) {
+      console.error(err);
+      setLoading(false);
+    }
+  }
+
+  if (loading) {
+    return <div className="loading-screen">Loading Game...</div>;
+  }
+
+  if (players.length === 0) {
+    return <div className="error-message">No players found.</div>;
+  }
 
   const currentPlayer = players[currentPlayerIndex];
   const currentClue = currentPlayer.clues[currentClueIndex];
