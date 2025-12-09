@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import GameHistory from '../components/GameHistory';
+
 import { useState, useEffect } from 'react';
 import Cookies from 'js-cookie';
 import { supabase } from '../supabaseClient';
@@ -219,11 +219,8 @@ function Profile({ onLogout }) {
 
 
 
-        {/* Recent Activity */}
-        <div className="activity-section">
-          <h2 className="section-title">Recent Games</h2>
-          <GameHistory limit={10} />
-        </div>
+        {/* Recent Activity - Removed as per user request */}
+        {/* <div className="activity-section"> ... </div> */}
 
         {/* Back to Dashboard */}
         <div className="profile-actions">

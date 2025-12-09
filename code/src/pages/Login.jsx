@@ -222,6 +222,8 @@ function Login(props) {
 
 
 
+            {errorMessageDiv}
+
             <div className="form-actions">
               <Link to="/forgot-password" className="forgot-password">Forgot password?</Link>
             </div>
