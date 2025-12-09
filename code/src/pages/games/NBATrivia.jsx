@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import Cookies from 'js-cookie';
 import Navbar from '../../components/Navbar';
 import { supabase } from '../../supabaseClient';
 import './NBATrivia.css';
@@ -26,7 +27,7 @@ function NBATrivia() {
       const { data, error } = await supabase
         .from('questions')
         .select('*')
-        .eq('category', 'trivia');
+        .eq('category', 'Trivia');
 
       if (error) {
         console.error('Error fetching questions:', error);
@@ -95,6 +96,80 @@ function NBATrivia() {
 
   const percentage = Math.round((score / questions.length) * 100);
   const progress = ((currentQuestion + 1) / questions.length) * 100;
+
+  const decodeJwt = (token) => {
+    try {
+      return JSON.parse(atob(token.split('.')[1]));
+    } catch (e) {
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    if (gameComplete) {
+      saveGameStats();
+    }
+  }, [gameComplete]);
+
+  const saveGameStats = async () => {
+    const token = Cookies.get('auth_token');
+    if (!token) return;
+
+    const decoded = decodeJwt(token);
+    const userId = decoded?.id;
+    if (!userId) return;
+
+    try {
+      // 1. Update Game Mode Stats for Trivia
+      const { data: existing } = await supabase
+        .from('user_game_mode_stats')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('game_mode', 'TSrivia')
+        .single();
+
+      const currentStreak = (existing?.current_streak || 0);
+      const newStreak = score === questions.length ? currentStreak + 1 : 0;
+
+      const newGamesPlayed = (existing?.games_played || 0) + 1;
+      const updatedStreak = score >= 5 ? currentStreak + 1 : 0;
+
+      await supabase
+        .from('user_game_mode_stats')
+        .upsert({
+          user_id: userId,
+          game_mode: 'trivia',
+          games_played: newGamesPlayed,
+          current_streak: updatedStreak,
+          best_score: Math.max(existing?.best_score || 0, totalPoints)
+        }, { onConflict: 'user_id, game_mode' });
+
+
+      // 2. Update Global Stats
+      const { data: global } = await supabase
+        .from('user_global_stats')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      const totalQuestions = (global?.total_questions || 0) + 10;
+      const currentPoints = (global?.total_points || 0) + totalPoints; // Use calculated totalPoints
+      const newXp = (global?.xp || 0) + score * 10;
+
+      await supabase
+        .from('user_global_stats')
+        .upsert({
+          user_id: userId,
+          total_questions: totalQuestions,
+          total_points: currentPoints,
+          xp: newXp,
+          last_active: new Date().toISOString()
+        }, { onConflict: 'user_id' });
+
+    } catch (err) {
+      console.error("Error saving stats:", err);
+    }
+  };
 
   if (gameComplete) {
     return (

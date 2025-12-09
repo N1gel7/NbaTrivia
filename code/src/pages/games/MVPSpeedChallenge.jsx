@@ -129,7 +129,7 @@ function MVPSpeedChallenge() {
       // Save new record
       const token = Cookies.get('auth_token');
       if (token) {
-        const decoded = jwt.decode(token);
+        const decoded = decodeJwt(token);
         try {
           await supabase
             .from('user_game_mode_stats')

@@ -96,17 +96,17 @@ function Dashboard({ onLogout }) {
 
       const newGameStats = {
         mvpSpeed: { best: 0 },
-        history: { questionsAnswered: 0 },
-        trivia: { currentStreak: 0 },
-        guessPlayer: { successRate: 0 }
+        history: { best: 0 },
+        trivia: { best: 0 },
+        guessPlayer: { best: 0 }
       };
 
       if (modes) {
         modes.forEach(m => {
-          if (m.game_mode === 'mvp_speed') newGameStats.mvpSpeed.best = m.best_score;
-          if (m.game_mode === 'history') newGameStats.history.questionsAnswered = m.games_played; // Approx
-          if (m.game_mode === 'trivia') newGameStats.trivia.currentStreak = m.current_streak;
-          if (m.game_mode === 'guess_player') newGameStats.guessPlayer.successRate = m.success_rate;
+          if (m.game_mode === 'mvp_speed') newGameStats.mvpSpeed.best = m.best_score || 0;
+          if (m.game_mode === 'history') newGameStats.history.best = m.best_score || 0;
+          if (m.game_mode === 'trivia') newGameStats.trivia.best = m.best_score || 0;
+          if (m.game_mode === 'guess_player') newGameStats.guessPlayer.best = m.best_score || 0;
         });
       }
       setGameStats(newGameStats);
@@ -276,7 +276,7 @@ function Dashboard({ onLogout }) {
               <p className="card-description">Deep dive into the archives. Answer questions from different eras.</p>
               <div className="personal-best-badge">
                 <Star className="star-icon" size={12} fill="currentColor" />
-                <span>Progress: {gameStats.history.questionsAnswered}/200</span>
+                <span>Personal Best: {gameStats.history.best}/10 Correct</span>
               </div>
               <button className="btn-play group" type="button">
                 <span>Play Now</span>
@@ -292,7 +292,7 @@ function Dashboard({ onLogout }) {
               <p className="card-description">The ultimate test of basketball knowledge. Random questions from all categories.</p>
               <div className="personal-best-badge">
                 <Star className="star-icon" size={12} fill="currentColor" />
-                <span>Current Streak: {gameStats.trivia.currentStreak}</span>
+                <span>Personal Best: {gameStats.trivia.best} Points</span>
               </div>
               <button className="btn-play group" type="button">
                 <span>Play Now</span>
@@ -308,7 +308,7 @@ function Dashboard({ onLogout }) {
               <p className="card-description">Identify the player based on career stats, teams, and achievements.</p>
               <div className="personal-best-badge">
                 <Star className="star-icon" size={12} fill="currentColor" />
-                <span>Success Rate: {gameStats.guessPlayer.successRate}%</span>
+                <span>Personal Best: {gameStats.guessPlayer.best} Points</span>
               </div>
               <button className="btn-play group" type="button">
                 <span>Play Now</span>
