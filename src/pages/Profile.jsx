@@ -10,11 +10,11 @@ function Profile({ onLogout }) {
   return (
     <div className="profile-page">
       <Navbar onLogout={onLogout} />
-      
+
       <div className="profile-content">
         {/* Profile Header */}
         <div className="profile-header">
-          <div className="profile-avatar-large">{currentUser.profilePic}</div>
+          <div className="profile-avatar-large"></div>
           <div className="profile-info">
             <h1>{currentUser.username}</h1>
             <p className="profile-email">{currentUser.email}</p>

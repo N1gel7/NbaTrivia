@@ -265,7 +265,7 @@ export const currentUser = {
   username: "CurrySplash",
   email: "baller@nba.com",
   joinDate: "January 15, 2024",
-  profilePic: "🏀",
+
   stats: {
     totalQuestions: 245,
     dailyStreak: 7,
