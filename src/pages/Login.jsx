@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { User, Lock, Eye, EyeOff } from 'lucide-react';
 import './Login.css';
 
 function Login({ onLogin }) {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
@@ -19,11 +19,11 @@ function Login({ onLogin }) {
 
 
     setTimeout(() => {
-      if (email === 'baller@nba.com' && password === 'password123') {
+      if (username === 'CurrySplash' && password === 'password123') {
         onLogin();
         navigate('/dashboard');
       } else {
-        setError('Invalid email or password');
+        setError('Invalid username or password');
         setLoading(false);
       }
     }, 1000);
@@ -54,13 +54,13 @@ function Login({ onLogin }) {
           <form onSubmit={handleSubmit}>
             <div className="input-group">
               <div className="input-wrapper">
-                <Mail className="input-icon" size={18} />
+                <User className="input-icon" size={18} />
                 <input
-                  type="email"
+                  type="text"
                   className="input"
-                  placeholder="Email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   required
                 />
               </div>
