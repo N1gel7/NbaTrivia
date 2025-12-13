@@ -17,7 +17,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ message: 'Email is required' });
     }
 
-
+    // Prevent script injection attacks by blocking common HTML/JS patterns
     const xssPattern = /(<script)|(<iframe)|(<object)|(<embed)|(<link)|(on\w+\s*=)|(javascript:)|(vbscript:)/i;
     if (xssPattern.test(email)) {
         return res.status(400).json({ message: 'Invalid input detected (XSS protection)' });
@@ -31,8 +31,6 @@ export default async function handler(req, res) {
             .single();
 
         if (error || !user) {
-            // In a strict security context, we shouldn't reveal this.
-            // But for this app's logic requirement, we must.
             return res.status(404).json({ message: 'Account not found' });
         }
 

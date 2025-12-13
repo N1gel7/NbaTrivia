@@ -16,7 +16,7 @@ function ResetPassword() {
     const [error, setError] = useState('');
     const [passwordStrength, setPasswordStrength] = useState(0);
 
-    // Reuse strength logic (duplication is acceptable for separation of concerns here or move to utils later)
+
     function calculatePasswordStrength(pass) {
         let strength = 0;
         if (pass.length >= 8) strength++;
@@ -145,7 +145,7 @@ function ResetPassword() {
                                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
                             </div>
-                            {/* Strength Meter UI */}
+
                             {password && (
                                 <div className="password-strength" style={{ marginTop: '5px' }}>
                                     <div className="strength-bar" style={{ height: '4px', background: '#eee', borderRadius: '2px', overflow: 'hidden' }}>
@@ -164,7 +164,7 @@ function ResetPassword() {
                                 </div>
                             )}
 
-                            {/* Password Requirements Checklist */}
+
                             {password && (
                                 <div className="password-requirements" style={{ fontSize: '12px', marginTop: '10px', color: '#666', textAlign: 'left' }}>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2px' }}>

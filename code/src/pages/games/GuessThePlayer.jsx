@@ -1,11 +1,18 @@
+
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import Navbar from '../../components/Navbar';
+import Skeleton from '../../components/Skeleton';
+import GameResults from '../../components/game/GameResults';
+import GuessHistoryList from '../../components/game/GuessHistoryList';
 import { supabase } from '../../supabaseClient';
+import { soundManager } from '../../utils/soundManager';
+import { celebrateGameComplete } from '../../utils/confetti';
 import './GuessThePlayer.css';
 
 function GuessThePlayer() {
+  // 1. STATE
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState(0);
   const [currentClueIndex, setCurrentClueIndex] = useState(0);
   const [guess, setGuess] = useState('');
@@ -13,11 +20,13 @@ function GuessThePlayer() {
   const [gameComplete, setGameComplete] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [gameHistory, setGameHistory] = useState([]);
-  const navigate = useNavigate();
 
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const navigate = useNavigate();
+
+  // 2. EFFECTS
   useEffect(() => {
     fetchGameData();
   }, []);
@@ -25,106 +34,12 @@ function GuessThePlayer() {
   useEffect(() => {
     if (gameComplete) {
       saveGameStats();
+      celebrateGameComplete();
+      soundManager.play('complete');
     }
   }, [gameComplete]);
 
-  const decodeJwt = (token) => {
-    try {
-      return JSON.parse(atob(token.split('.')[1]));
-    } catch (e) {
-      return null;
-    }
-  };
-
-  const saveGameStats = async () => {
-    const token = Cookies.get('auth_token');
-    if (!token) return;
-
-    const decoded = decodeJwt(token);
-    const userId = decoded?.id;
-    if (!userId) return;
-
-    try {
-      // 1. Update Game Mode Stats
-      const { data: existing } = await supabase
-        .from('user_game_mode_stats')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('game_mode', 'guess_player')
-        .single();
-
-      const newGamesPlayed = (existing?.games_played || 0) + 1;
-      // Calculate success rate: (total_score / possible_score) * 100? Or just wins? 
-      // Let's use score / max possible score logic or just store raw points?
-
-      await supabase
-        .from('user_game_mode_stats')
-        .upsert({
-          user_id: userId,
-          game_mode: 'guess_player',
-          games_played: newGamesPlayed,
-          best_score: Math.max(existing?.best_score || 0, score)
-        }, { onConflict: 'user_id, game_mode' });
-
-      // 2. Update Global Stats
-      const { data: global } = await supabase
-        .from('user_global_stats')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      const totalQuestions = (global?.total_questions || 0) + 5; // 5 players
-      const currentPoints = (global?.total_points || 0) + score;
-
-      // Calculate average score (score out of 2500 max)
-      const percentageThisGame = Math.round((score / 2500) * 100);
-      const previousAvg = global?.avg_score || 0;
-      const gamesPlayed = Math.floor((global?.total_questions || 0) / 5) + 1;
-      const newAvgScore = Math.round(((previousAvg * (gamesPlayed - 1)) + percentageThisGame) / gamesPlayed);
-
-      // Calculate daily streak based on last_played date
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-      let dailyStreak = 1;
-      if (global?.last_played) {
-        const lastPlayed = new Date(global.last_played);
-        const lastPlayedDate = new Date(lastPlayed.getFullYear(), lastPlayed.getMonth(), lastPlayed.getDate());
-        const daysDiff = Math.floor((today - lastPlayedDate) / (1000 * 60 * 60 * 24));
-
-        if (daysDiff === 0) {
-          dailyStreak = global.daily_streak || 1;
-        } else if (daysDiff === 1) {
-          dailyStreak = (global.daily_streak || 0) + 1;
-        }
-      }
-
-      await supabase
-        .from('user_global_stats')
-        .upsert({
-          user_id: userId,
-          total_questions: totalQuestions,
-          total_points: currentPoints,
-          avg_score: newAvgScore,
-          daily_streak: dailyStreak,
-          last_played: now.toISOString()
-        }, { onConflict: 'user_id' });
-
-      // 3. Save Game Session
-      await supabase
-        .from('game_sessions')
-        .insert({
-          user_id: userId,
-          game_mode: 'guess_player',
-          score: score,
-          played_at: new Date().toISOString()
-        });
-
-    } catch (err) {
-      console.error("Error saving stats:", err);
-    }
-  };
-
+  // 3. LOGIC & API
   async function fetchGameData() {
     try {
       const { data, error } = await supabase
@@ -137,13 +52,12 @@ function GuessThePlayer() {
         // Randomize
         const shuffled = data.sort(() => Math.random() - 0.5);
         const selected = shuffled.slice(0, 5);
-        const formatted = selected.map(p => {
-          return {
-            player: (p.first_name || '') + ' ' + (p.last_name || ''),
-            clues: Array.isArray(p.clues) ? p.clues : [],
-            stats: p.stats || 'No stats available'
-          };
-        });
+
+        const formatted = selected.map(p => ({
+          player: (p.first_name || '') + ' ' + (p.last_name || ''),
+          clues: Array.isArray(p.clues) ? p.clues : [],
+          stats: p.stats || 'No stats available'
+        }));
 
         setPlayers(formatted);
       }
@@ -154,17 +68,78 @@ function GuessThePlayer() {
     }
   }
 
+  const saveGameStats = async () => {
+    const token = Cookies.get('auth_token');
+    if (!token) return;
+
+    try {
+      const correctGuesses = gameHistory.filter(h => h.correct).length;
+      await fetch('/api/submit-game', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          gameMode: 'guess_player',
+          score: score,
+          correctGuesses: correctGuesses,
+          totalPlayers: players.length
+        })
+      });
+    } catch (err) {
+      console.error("Error saving stats:", err);
+    }
+  };
+
   if (loading) {
-    return <div className="loading-screen">Loading Game...</div>;
+    // Keep skeleton logic simple
+    return (
+      <div className="guess-player-game">
+        <Navbar onLogout={() => { }} />
+        <div className="game-container">
+          <Skeleton type="title" style={{ width: '100%', height: '300px' }} />
+        </div>
+      </div>
+    );
   }
 
   if (players.length === 0) {
-    return <div className="error-message">No players found.</div>;
+    return (
+      <div className="guess-player-game">
+        <Navbar onLogout={() => navigate('/login')} />
+        <div className="game-container">
+          <div className="error-message">No players found!</div>
+        </div>
+      </div>
+    );
   }
 
+  // GAME OVER
+  if (gameComplete) {
+    const correctCount = gameHistory.filter(h => h.correct).length;
+
+    return (
+      <div className="guess-player-game">
+        <Navbar onLogout={() => navigate('/login')} />
+        <div className="game-container">
+          <GameResults
+            title="Mystery Solved!"
+            score={correctCount}
+            total={players.length}
+            points={score}
+            gameMode="guess_player"
+          >
+            <GuessHistoryList history={gameHistory} maxClues={5} />
+          </GameResults>
+        </div>
+      </div>
+    );
+  }
+
+  // ACTIVE GAME LOGIC
   const currentPlayer = players[currentPlayerIndex];
   const currentClue = currentPlayer.clues[currentClueIndex];
   const maxClues = currentPlayer.clues.length;
+  // Clues are worth less as you go (500 -> 100)
   const pointsForClue = [500, 400, 300, 200, 100];
   const currentPoints = pointsForClue[currentClueIndex];
 
@@ -176,18 +151,18 @@ function GuessThePlayer() {
 
     if (normalizedGuess === normalizedPlayer) {
       const pointsEarned = currentPoints;
+      soundManager.play('correct');
       setScore(score + pointsEarned);
       setRevealed(true);
-      setGameHistory([
-        ...gameHistory,
-        {
-          player: currentPlayer.player,
-          cluesUsed: currentClueIndex + 1,
-          points: pointsEarned,
-          correct: true
-        }
-      ]);
+
+      setGameHistory([...gameHistory, {
+        player: currentPlayer.player,
+        cluesUsed: currentClueIndex + 1,
+        points: pointsEarned,
+        correct: true
+      }]);
     } else {
+      soundManager.play('wrong');
       alert('Incorrect! Try again or reveal the next clue.');
     }
   };
@@ -196,16 +171,14 @@ function GuessThePlayer() {
     if (currentClueIndex < maxClues - 1) {
       setCurrentClueIndex(currentClueIndex + 1);
     } else {
+      // Out of clues -> fail
       setRevealed(true);
-      setGameHistory([
-        ...gameHistory,
-        {
-          player: currentPlayer.player,
-          cluesUsed: maxClues,
-          points: 0,
-          correct: false
-        }
-      ]);
+      setGameHistory([...gameHistory, {
+        player: currentPlayer.player,
+        cluesUsed: maxClues,
+        points: 0,
+        correct: false
+      }]);
     }
   };
 
@@ -220,61 +193,18 @@ function GuessThePlayer() {
     }
   };
 
-  const handleLogout = () => {
-    navigate('/login');
-  };
-
-  if (gameComplete) {
-    return (
-      <div className="guess-player-game">
-        <Navbar onLogout={handleLogout} />
-        <div className="game-container">
-          <div className="results-screen">
-            <h1>Game Complete!</h1>
-            <div className="final-score">
-              <div className="score-number">{score}</div>
-              <div className="score-label">Total Points</div>
-            </div>
-
-            <div className="game-history">
-              <h2>Your Guesses</h2>
-              {gameHistory.map((item, index) => (
-                <div key={index} className={`history - item ${item.correct ? 'correct' : 'incorrect'} `}>
-                  <div className="history-player">
-                    <span className="player-icon">{item.correct ? '✓' : '✗'}</span>
-                    <span className="player-name">{item.player}</span>
-                  </div>
-                  <div className="history-details">
-                    <span>Clues used: {item.cluesUsed}/{maxClues}</span>
-                    {item.points > 0 && (
-                      <span className="history-points">+{item.points} pts</span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="game-actions">
-              <button
-                className="btn btn-orange"
-                onClick={() => window.location.reload()}
-              >
-                Play Again
-              </button>
-              <Link to="/dashboard" className="btn btn-secondary">
-                Return Home
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+  // Determine button text helper
+  let nextButtonText = 'Next Player';
+  if (currentPlayerIndex >= players.length - 1) {
+    nextButtonText = 'View Results';
   }
 
   return (
     <div className="guess-player-game">
-      <Navbar onLogout={handleLogout} />
+      <Navbar onLogout={() => navigate('/login')} />
+
       <div className="game-container">
+        {/* Header */}
         <div className="game-header">
           <div className="player-counter">
             Player {currentPlayerIndex + 1} of {players.length}
@@ -284,6 +214,7 @@ function GuessThePlayer() {
           </div>
         </div>
 
+        {/* Clue Section */}
         <div className="clue-section">
           <div className="clue-number">
             Clue {currentClueIndex + 1} of {maxClues}
@@ -304,7 +235,9 @@ function GuessThePlayer() {
                 placeholder="Who am I?"
                 value={guess}
                 onChange={(e) => setGuess(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleGuess()}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') handleGuess();
+                }}
                 autoFocus
               />
               <div className="guess-actions">
@@ -321,24 +254,29 @@ function GuessThePlayer() {
           {revealed && (
             <div className="reveal-section">
               <div className="player-reveal">
-
                 <div className="player-name-large">{currentPlayer.player}</div>
                 <div className="player-stats">{currentPlayer.stats}</div>
               </div>
               <button className="btn btn-orange btn-full" onClick={handleNextPlayer}>
-                {currentPlayerIndex < players.length - 1 ? 'Next Player' : 'View Results'}
+                {nextButtonText}
               </button>
             </div>
           )}
         </div>
 
+        {/* Progress Dots */}
         <div className="clues-progress">
-          {currentPlayer.clues.map((_, index) => (
-            <div
-              key={index}
-              className={`clue - dot ${index <= currentClueIndex ? 'revealed' : ''} `}
-            ></div>
-          ))}
+          {currentPlayer.clues.map((_, index) => {
+            // Explicit class logic
+            let dotClass = 'clue-dot';
+            if (index <= currentClueIndex) {
+              dotClass += ' revealed';
+            }
+
+            return (
+              <div key={index} className={dotClass}></div>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -346,4 +284,3 @@ function GuessThePlayer() {
 }
 
 export default GuessThePlayer;
-

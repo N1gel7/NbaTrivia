@@ -1,12 +1,18 @@
+
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, Lock, Eye, EyeOff } from 'lucide-react';
 import Cookies from 'js-cookie';
 import './Login.css';
 
+/**
+ * Login Page
+ * Handles user authentication, including lockout timer display and role-based redirection.
+ */
 function Login(props) {
   const onLogin = props.onLogin;
 
+  // 1. STATE
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -17,7 +23,11 @@ function Login(props) {
 
   const navigate = useNavigate();
 
-  // Timer Effect
+  // 2. EFFECTS
+  /**
+   * Lockout Timer Countdown
+   * Updates the "Try again in X:XX" text every second if a lockout is active.
+   */
   useEffect(() => {
     if (!lockoutEnd) {
       setTimeLeft('');
@@ -44,119 +54,83 @@ function Login(props) {
     return () => clearInterval(interval);
   }, [lockoutEnd]);
 
+  // 3. LOGIC
+  /**
+   * Check if client-side throttle allows login
+   * Prevents spamming the submit button locally (1 second cooldown)
+   */
   function canLogin() {
     const lastAttempt = localStorage.getItem('last_login_attempt');
-    if (lastAttempt === null) {
-      return true;
-    }
+    if (lastAttempt === null) return true;
 
     const now = Date.now();
     const last = parseInt(lastAttempt);
     const timeSince = now - last;
 
-    if (timeSince > 1000) {
-      return true;
-    } else {
-      return false;
-    }
+    // 1 second buffer
+    return timeSince > 1000;
   }
 
   function handleSubmit(e) {
     e.preventDefault();
     setError('');
 
-    if (canLogin() === false) {
+    if (!canLogin()) {
       setError('Please wait a moment before trying again.');
       return;
     }
 
     const nowStr = Date.now().toString();
     localStorage.setItem('last_login_attempt', nowStr);
-
     setLoading(true);
 
-    const bodyData = {
-      username: username,
-      password: password
-    };
+    const bodyData = { username, password };
 
+    // API Call
     fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(bodyData)
     })
-      .then(function (response) {
-        return response.json().then(function (data) {
-          // We return an object with both response status and data
-          const result = {
-            ok: response.ok,
-            data: data
-          };
-          return result;
-        });
-      })
-      .then(function (result) {
-        if (result.ok === false) {
-          const msg = result.data.message;
-
-          let errorMsg = 'Login failed';
-          if (msg !== undefined) {
-            errorMsg = msg;
-          }
-
+      .then(response => response.json().then(data => ({ ok: response.ok, data })))
+      .then(result => {
+        // Handle Error / Lockout
+        if (!result.ok) {
           if (result.data.lockoutUntil) {
             setLockoutEnd(result.data.lockoutUntil);
           }
-
-          // Throw simple error string to catch block
-          throw new Error(errorMsg);
+          throw new Error(result.data.message || 'Login failed');
         }
 
-        const token = result.data.token;
+        // Handle Success
+        const { token, user } = result.data;
+        const role = user.role;
+        const expiry = 1; // 1 Day
 
-        // Calculate expires
-        const expiry = 1;
+        console.log('Login Successful:', user);
 
         Cookies.set('auth_token', token, { expires: expiry });
+        onLogin(); // Update global auth state
 
-        onLogin(); // Prop function
-        navigate('/dashboard');
+        // Role-Based Redirection
+        if (role && role.toLowerCase() === 'admin') {
+          navigate('/admin');
+        } else {
+          navigate('/dashboard');
+        }
         setLoading(false);
       })
-      .catch(function (err) {
+      .catch(err => {
         console.error('Login error:', err);
-        let errMsg = 'Failed to login';
-        if (err.message) {
-          errMsg = err.message;
-        }
-        setError(errMsg);
+        setError(err.message || 'Failed to login');
         setLoading(false);
       });
   }
 
-  // Password Input Type logic
-  let passwordInputType = 'password';
-  if (showPassword === true) {
-    passwordInputType = 'text';
-  }
-
-  // Password Icon Logic
-  let passwordIcon = <Eye size={18} />;
-  if (showPassword === true) {
-    passwordIcon = <EyeOff size={18} />;
-  }
-
-  // Button Text Logic
-  let buttonText = 'Sign In';
-  if (loading === true) {
-    buttonText = 'Logging in...';
-  }
-
-  // Error Message Logic
-  let errorMessageDiv = null;
-  if (error !== '') {
-    errorMessageDiv = <div className="error-message">{error}</div>;
-  }
+  // 4. RENDER HELPERS
+  const passwordInputType = showPassword ? 'text' : 'password';
+  const passwordIcon = showPassword ? <EyeOff size={18} /> : <Eye size={18} />;
+  const buttonText = loading ? 'Logging in...' : 'Sign In';
 
   return (
     <div className="login-container">
@@ -192,7 +166,7 @@ function Login(props) {
                   className="input"
                   placeholder="Enter your username"
                   value={username}
-                  onChange={function (e) { setUsername(e.target.value); }}
+                  onChange={(e) => setUsername(e.target.value)}
                   required
                 />
               </div>
@@ -207,22 +181,20 @@ function Login(props) {
                   className="input"
                   placeholder="••••••••"
                   value={password}
-                  onChange={function (e) { setPassword(e.target.value); }}
+                  onChange={(e) => setPassword(e.target.value)}
                   required
                 />
                 <button
                   type="button"
                   className="password-toggle"
-                  onClick={function () { setShowPassword(!showPassword); }}
+                  onClick={() => setShowPassword(!showPassword)}
                 >
                   {passwordIcon}
                 </button>
               </div>
             </div>
 
-
-
-            {errorMessageDiv}
+            {error && <div className="error-message">{error}</div>}
 
             <div className="form-actions">
               <Link to="/forgot-password" className="forgot-password">Forgot password?</Link>

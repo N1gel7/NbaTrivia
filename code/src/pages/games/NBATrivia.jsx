@@ -1,11 +1,19 @@
+
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import Navbar from '../../components/Navbar';
+import Skeleton from '../../components/Skeleton';
+import GameQuestion from '../../components/game/GameQuestion';
+import GameResults from '../../components/game/GameResults';
+import QuestionReviewList from '../../components/game/QuestionReviewList';
 import { supabase } from '../../supabaseClient';
+import { soundManager } from '../../utils/soundManager';
+import { celebratePerfectScore, celebrateGameComplete } from '../../utils/confetti';
 import './NBATrivia.css';
 
 function NBATrivia() {
+  // 1. STATE
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [showResult, setShowResult] = useState(false);
@@ -13,11 +21,13 @@ function NBATrivia() {
   const [totalPoints, setTotalPoints] = useState(0);
   const [answers, setAnswers] = useState([]);
   const [gameComplete, setGameComplete] = useState(false);
-  const navigate = useNavigate();
 
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const navigate = useNavigate();
+
+  // 2. EFFECTS
   useEffect(() => {
     fetchQuestions();
   }, []);
@@ -25,54 +35,18 @@ function NBATrivia() {
   useEffect(() => {
     if (gameComplete) {
       saveGameStats();
+
+      // Celebrate!
+      if (score === questions.length) {
+        celebratePerfectScore();
+      } else {
+        celebrateGameComplete();
+      }
+      soundManager.play('complete');
     }
   }, [gameComplete]);
 
-  const decodeJwt = (token) => {
-    try {
-      return JSON.parse(atob(token.split('.')[1]));
-    } catch (e) {
-      return null;
-    }
-  };
-
-  const saveGameStats = async () => {
-    const token = Cookies.get('auth_token');
-    if (!token) return;
-
-    try {
-      const response = await fetch('/api/submit-game', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          token,
-          gameMode: 'trivia',
-          answers: answers.map(a => ({
-            questionId: a.questionId,
-            selectedAnswer: a.selectedAnswer
-          }))
-        })
-      });
-
-      if (!response.ok) {
-        const errData = await response.json();
-        console.error("Server validation failed:", errData);
-        return;
-      }
-
-      const result = await response.json();
-      console.log("Game submitted securely:", result);
-
-      // Optionally update local state with verified result if needed
-      // setTotalPoints(result.totalPoints);
-
-    } catch (err) {
-      console.error("Error saving stats:", err);
-    }
-  };
-
+  // 3. LOGIC & API
   async function fetchQuestions() {
     try {
       const { data, error } = await supabase
@@ -83,8 +57,8 @@ function NBATrivia() {
       if (error) {
         console.error('Error fetching questions:', error);
       } else {
+        // Shuffle and take 10
         const shuffled = data.sort(() => Math.random() - 0.5);
-        // Ensure ID is present. It should be since select('*') includes it.
         setQuestions(shuffled.slice(0, 10));
       }
       setLoading(false);
@@ -94,49 +68,69 @@ function NBATrivia() {
     }
   }
 
-  if (loading) {
-    return <div className="loading-screen">Loading Trivia...</div>;
-  }
+  const saveGameStats = async () => {
+    const token = Cookies.get('auth_token');
+    if (!token) return;
 
-  if (questions.length === 0) {
-    return <div className="error-message">No questions found.</div>;
-  }
+    try {
+      await fetch('/api/submit-game', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          gameMode: 'trivia',
+          answers: answers.map(a => ({
+            questionId: a.questionId,
+            selectedAnswer: a.selectedAnswer
+          }))
+        })
+      });
+    } catch (err) {
+      console.error("Error saving stats:", err);
+    }
+  };
 
   const handleAnswerSelect = (index) => {
-    if (showResult) return;
+    if (showResult) return; // Prevent multiple clicks
+
     setSelectedAnswer(index);
     setShowResult(true);
 
     const question = questions[currentQuestion];
     const isCorrect = index === question.correct;
 
+    // Sound
     if (isCorrect) {
+      soundManager.play('correct');
       setScore(score + 1);
       setTotalPoints(totalPoints + question.points);
+    } else {
+      soundManager.play('wrong');
     }
 
-    setAnswers([
-      ...answers,
-      {
-        questionId: question.id,
-        selectedAnswer: index,
-        question: question.question,
-        selected: index,
-        correct: question.correct,
-        isCorrect,
-        points: isCorrect ? question.points : 0,
-        difficulty: question.difficulty
-      }
-    ]);
+    // Save history
+    const newAnswer = {
+      questionId: question.id,
+      selectedAnswer: index,
+      question: question.question,
+      selected: index,
+      correct: question.correct,
+      isCorrect: isCorrect,
+      points: isCorrect ? question.points : 0,
+      difficulty: question.difficulty
+    };
+
+    setAnswers([...answers, newAnswer]);
   };
 
   const handleNext = () => {
-    if (currentQuestion < questions.length - 1) {
+    // Check if it was the last question
+    if (currentQuestion >= questions.length - 1) {
+      setGameComplete(true);
+    } else {
       setCurrentQuestion(currentQuestion + 1);
       setSelectedAnswer(null);
       setShowResult(false);
-    } else {
-      setGameComplete(true);
     }
   };
 
@@ -144,149 +138,68 @@ function NBATrivia() {
     navigate('/login');
   };
 
-  const getDifficultyIcons = (difficulty) => {
-    return '🏀'.repeat(difficulty);
-  };
-
-  const percentage = Math.round((score / questions.length) * 100);
-  const progress = ((currentQuestion + 1) / questions.length) * 100;
-
-  if (gameComplete) {
+  // 4. RENDER
+  if (loading) {
+    // Keep the skeleton for specific page feel, or make a component
+    // For now, I'll simplify the skeleton code here to keep file small
     return (
       <div className="trivia-game">
-        <Navbar onLogout={handleLogout} />
+        <Navbar onLogout={() => { }} />
         <div className="game-container">
-          <div className="results-screen">
-            <h1>Trivia Complete!</h1>
-            <div className="results-summary">
-              <div className="score-card">
-                <div className="score-main">{score}/{questions.length}</div>
-                <div className="score-label">Correct Answers</div>
-              </div>
-              <div className="score-card">
-                <div className="score-main">{totalPoints}</div>
-                <div className="score-label">Total Points</div>
-              </div>
-              <div className="score-card">
-                <div className="score-main">{percentage}%</div>
-                <div className="score-label">Accuracy</div>
-              </div>
-            </div>
-
-            <div className="questions-review">
-              <h2>Question Review</h2>
-              {answers.map((answer, index) => (
-                <div key={index} className="review-item">
-                  <div className="review-header">
-                    <div className={`review-icon ${answer.isCorrect ? 'correct' : 'incorrect'}`}>
-                      {answer.isCorrect ? '✓' : '✗'}
-                    </div>
-                    <div className="review-difficulty">
-                      {getDifficultyIcons(answer.difficulty)}
-                    </div>
-                    {answer.isCorrect && (
-                      <div className="review-points">+{answer.points} pts</div>
-                    )}
-                  </div>
-                  <div className="review-content">
-                    <div className="review-question">{answer.question}</div>
-                    <div className={`review-answer ${answer.isCorrect ? 'correct' : 'incorrect'}`}>
-                      {answer.isCorrect ? 'Correct!' : 'Incorrect'}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="game-actions">
-              <button
-                className="btn btn-orange"
-                onClick={() => window.location.reload()}
-              >
-                Play Again
-              </button>
-              <Link to="/dashboard" className="btn btn-secondary">
-                Return Home
-              </Link>
-            </div>
-          </div>
+          <Skeleton type="title" style={{ width: '100%', height: '300px' }} />
         </div>
       </div>
     );
   }
 
-  const question = questions[currentQuestion];
+  if (questions.length === 0) {
+    return (
+      <div className="trivia-game">
+        <Navbar onLogout={handleLogout} />
+        <div className="game-container">
+          <div className="error-message">No questions found!</div>
+        </div>
+      </div>
+    );
+  }
 
+  // GAME OVER VIEW
+  if (gameComplete) {
+    return (
+      <div className="trivia-game">
+        <Navbar onLogout={handleLogout} />
+        <div className="game-container">
+          <GameResults
+            title="Trivia Complete!"
+            score={score}
+            total={questions.length}
+            points={totalPoints}
+            gameMode="trivia"
+          >
+            <QuestionReviewList answers={answers} />
+          </GameResults>
+        </div>
+      </div>
+    );
+  }
+
+  // ACTIVE GAME VIEW
   return (
     <div className="trivia-game">
       <Navbar onLogout={handleLogout} />
-      <div className="game-container">
-        <div className="progress-bar-container">
-          <div className="progress-bar">
-            <div
-              className="progress-fill"
-              style={{ width: `${progress}%` }}
-            ></div>
-          </div>
-          <div className="progress-info">
-            <span>Question {currentQuestion + 1} of {questions.length}</span>
-            <span className="points-display">Points: {totalPoints}</span>
-          </div>
-        </div>
 
-        <div className="question-card">
-          <div className="question-header">
-            <div className="difficulty-badge">
-              {getDifficultyIcons(question.difficulty)}
-            </div>
-            <div className="points-badge">{question.points} points</div>
-          </div>
-
-          <h2 className="question-text">{question.question}</h2>
-
-          <div className="answers-grid">
-            {question.options.map((option, index) => {
-              let buttonClass = 'answer-button';
-              if (showResult) {
-                if (index === question.correct) {
-                  buttonClass += ' correct';
-                } else if (index === selectedAnswer && index !== question.correct) {
-                  buttonClass += ' incorrect';
-                }
-              } else if (index === selectedAnswer) {
-                buttonClass += ' selected';
-              }
-
-              return (
-                <button
-                  key={index}
-                  className={buttonClass}
-                  onClick={() => handleAnswerSelect(index)}
-                  disabled={showResult}
-                >
-                  {option}
-                </button>
-              );
-            })}
-          </div>
-
-          {showResult && (
-            <div className="result-feedback">
-              <div className={`feedback-message ${selectedAnswer === question.correct ? 'correct' : 'incorrect'}`}>
-                {selectedAnswer === question.correct
-                  ? `✓ Correct! +${question.points} points`
-                  : '✗ Incorrect'}
-              </div>
-              <button className="btn btn-primary btn-full" onClick={handleNext}>
-                {currentQuestion < questions.length - 1 ? 'Next Question' : 'View Results'}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+      <GameQuestion
+        question={questions[currentQuestion]}
+        currentIndex={currentQuestion}
+        total={questions.length}
+        score={totalPoints}
+        selectedAnswer={selectedAnswer}
+        showResult={showResult}
+        handleAnswerSelect={handleAnswerSelect}
+        handleNext={handleNext}
+      />
     </div>
   );
 }
 
 export default NBATrivia;
-

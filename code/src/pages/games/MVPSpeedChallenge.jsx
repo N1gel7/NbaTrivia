@@ -1,12 +1,18 @@
+
 import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import { supabase } from '../../supabaseClient';
 import Navbar from '../../components/Navbar';
+import Skeleton from '../../components/Skeleton';
+import GameResults from '../../components/game/GameResults';
+import { soundManager } from '../../utils/soundManager';
+import { celebrateGameComplete } from '../../utils/confetti';
 import './MVPSpeedChallenge.css';
 
 function MVPSpeedChallenge() {
-  const [gameState, setGameState] = useState('pre');
+  // 1. STATE
+  const [gameState, setGameState] = useState('pre'); // 'pre', 'playing', 'post'
   const [timeLeft, setTimeLeft] = useState(60);
   const [input, setInput] = useState('');
   const [correctAnswers, setCorrectAnswers] = useState([]);
@@ -15,31 +21,38 @@ function MVPSpeedChallenge() {
   const [personalBest, setPersonalBest] = useState(0);
   const [allMVPs, setAllMVPs] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const inputRef = useRef(null);
   const navigate = useNavigate();
 
+  // 2. EFFECTS
   useEffect(() => {
     fetchGameData();
   }, []);
 
-  const decodeJwt = (token) => {
-    try {
-      return JSON.parse(atob(token.split('.')[1]));
-    } catch (e) {
-      return null;
+  useEffect(() => {
+    if (gameState === 'playing') {
+      if (timeLeft > 0) {
+        const timer = setTimeout(() => {
+          setTimeLeft(timeLeft - 1);
+        }, 1000);
+        return () => clearTimeout(timer);
+      } else {
+        endGame();
+      }
     }
-  };
+  }, [gameState, timeLeft]);
 
+  // 3. LOGIC & API
   const fetchGameData = async () => {
     try {
-      // 1. Fetch MVP Names
+      // Fetch MVP names
       const { data: mvpData, error: mvpError } = await supabase
         .from('mvp_winners')
         .select('first_name, last_name');
 
       if (mvpError) throw mvpError;
 
-      // Construct full names and deduplicate
       const names = new Set();
       mvpData.forEach(p => {
         const fullName = `${p.first_name} ${p.last_name}`.toLowerCase().trim().replace(/\s+/g, ' ');
@@ -47,20 +60,23 @@ function MVPSpeedChallenge() {
       });
       setAllMVPs(Array.from(names));
 
-      // 2. Fetch Personal Best
+      // Fetch personal best
       const token = Cookies.get('auth_token');
       if (token) {
-        const decoded = decodeJwt(token);
-        if (decoded?.id) {
-          const { data: stats } = await supabase
-            .from('user_game_mode_stats')
-            .select('best_score')
-            .eq('user_id', decoded.id)
-            .eq('game_mode', 'mvp_speed')
-            .single();
+        // Decode manually or use helper if imported (we'll just use simple decode here for speed)
+        try {
+          const decoded = JSON.parse(atob(token.split('.')[1]));
+          if (decoded?.id) {
+            const { data: stats } = await supabase
+              .from('user_game_mode_stats')
+              .select('best_score')
+              .eq('user_id', decoded.id)
+              .eq('game_mode', 'mvp_speed')
+              .single();
 
-          if (stats) setPersonalBest(stats.best_score);
-        }
+            if (stats) setPersonalBest(stats.best_score);
+          }
+        } catch (e) { /* ignore invalid token */ }
       }
 
       setLoading(false);
@@ -70,17 +86,6 @@ function MVPSpeedChallenge() {
     }
   };
 
-  useEffect(() => {
-    if (gameState === 'playing' && timeLeft > 0) {
-      const timer = setTimeout(() => {
-        setTimeLeft(timeLeft - 1);
-      }, 1000);
-      return () => clearTimeout(timer);
-    } else if (gameState === 'playing' && timeLeft === 0) {
-      endGame();
-    }
-  }, [gameState, timeLeft]);
-
   const startGame = () => {
     setGameState('playing');
     setTimeLeft(60);
@@ -88,224 +93,116 @@ function MVPSpeedChallenge() {
     setIncorrectAnswers([]);
     setScore(0);
     setInput('');
-    setTimeout(() => inputRef.current?.focus(), 100);
+    // Focus input slightly after render
+    setTimeout(() => {
+      if (inputRef.current) inputRef.current.focus();
+    }, 100);
   };
 
   const handleInputChange = (e) => {
-    const value = e.target.value;
-    setInput(value);
+    setInput(e.target.value);
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && input.trim()) {
-      checkAnswer(input.trim());
-      setInput('');
+    if (e.key === 'Enter') {
+      if (input.trim()) {
+        checkAnswer(input.trim());
+        setInput('');
+      }
     }
   };
 
   const checkAnswer = (answer) => {
     const normalizedAnswer = answer.toLowerCase();
     const isCorrect = allMVPs.includes(normalizedAnswer);
+    const alreadyAnswered = correctAnswers.includes(normalizedAnswer);
 
-    if (isCorrect && !correctAnswers.includes(normalizedAnswer)) {
+    if (isCorrect && !alreadyAnswered) {
+      soundManager.play('correct');
       setCorrectAnswers([...correctAnswers, normalizedAnswer]);
       setScore(score + 1);
-    } else if (!isCorrect) {
-      setIncorrectAnswers([...incorrectAnswers, answer]);
-      // Shake animation
-      if (inputRef.current) {
-        inputRef.current.classList.add('shake');
-        setTimeout(() => {
-          inputRef.current?.classList.remove('shake');
-        }, 500);
+    } else {
+      if (!isCorrect) {
+        soundManager.play('wrong');
+        setIncorrectAnswers([...incorrectAnswers, answer]);
+
+        // Shake effect
+        if (inputRef.current) {
+          inputRef.current.classList.add('shake');
+          setTimeout(() => {
+            if (inputRef.current) inputRef.current.classList.remove('shake');
+          }, 500);
+        }
       }
     }
   };
 
   const endGame = async () => {
     setGameState('post');
+    celebrateGameComplete();
+    soundManager.play('complete');
+
+    // Update PB locally if beaten
+    if (score > personalBest) {
+      setPersonalBest(score);
+    }
 
     const token = Cookies.get('auth_token');
     if (token) {
-      const decoded = decodeJwt(token);
       try {
-        // 1. Update Game Mode Stats
-        const { data: existing } = await supabase
-          .from('user_game_mode_stats')
-          .select('*')
-          .eq('user_id', decoded.id)
-          .eq('game_mode', 'mvp_speed')
-          .single();
-
-        const newGamesPlayed = (existing?.games_played || 0) + 1;
-        const newBestScore = Math.max(existing?.best_score || 0, score);
-
-        if (score > personalBest) {
-          setPersonalBest(score);
-        }
-
-        await supabase
-          .from('user_game_mode_stats')
-          .upsert({
-            user_id: decoded.id,
-            game_mode: 'mvp_speed',
-            best_score: newBestScore,
-            games_played: newGamesPlayed,
-          }, { onConflict: 'user_id, game_mode' });
-
-        // 2. Update Global Stats
-        const { data: global } = await supabase
-          .from('user_global_stats')
-          .select('*')
-          .eq('user_id', decoded.id)
-          .single();
-
-        const totalQuestions = (global?.total_questions || 0) + 1; // 1 game session
-        const currentPoints = (global?.total_points || 0) + score;
-
-        // Calculate average score (MVP count as percentage of total possible)
-        const totalMVPs = allMVPs.length || 1;
-        const percentageThisGame = Math.round((score / totalMVPs) * 100);
-        const previousAvg = global?.avg_score || 0;
-        const gamesPlayed = (global?.total_questions || 0) + 1;
-        const newAvgScore = Math.round(((previousAvg * (gamesPlayed - 1)) + percentageThisGame) / gamesPlayed);
-
-        // Calculate daily streak
-        const now = new Date();
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-        let dailyStreak = 1;
-        if (global?.last_played) {
-          const lastPlayed = new Date(global.last_played);
-          const lastPlayedDate = new Date(lastPlayed.getFullYear(), lastPlayed.getMonth(), lastPlayed.getDate());
-          const daysDiff = Math.floor((today - lastPlayedDate) / (1000 * 60 * 60 * 24));
-
-          if (daysDiff === 0) {
-            dailyStreak = global.daily_streak || 1;
-          } else if (daysDiff === 1) {
-            dailyStreak = (global.daily_streak || 0) + 1;
-          }
-        }
-
-        await supabase
-          .from('user_global_stats')
-          .upsert({
-            user_id: decoded.id,
-            total_questions: totalQuestions,
-            total_points: currentPoints,
-            avg_score: newAvgScore,
-            daily_streak: dailyStreak,
-            last_played: now.toISOString()
-          }, { onConflict: 'user_id' });
-
-        // 3. Save Game Session
-        await supabase
-          .from('game_sessions')
-          .insert({
-            user_id: decoded.id,
-            game_mode: 'mvp_speed',
+        await fetch('/api/submit-game', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token,
+            gameMode: 'mvp_speed',
             score: score,
-            played_at: new Date().toISOString()
-          });
-
-
-
+            totalMVPs: allMVPs.length
+          })
+        });
       } catch (err) {
         console.error('Error saving score:', err);
       }
     }
   };
 
-  const handleLogout = () => {
-    Cookies.remove('auth_token');
-    navigate('/login');
-  };
-
+  // 4. RENDER
   if (loading) {
-    return <div className="loading-screen">Loading Game Data...</div>;
+    return (
+      <div className="mvp-speed-game">
+        <Navbar onLogout={() => { }} />
+        <div className="game-container">
+          <div className="pre-game-screen">
+            <Skeleton type="title" style={{ width: '200px', height: '48px', margin: '0 auto' }} />
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  const totalMVPs = allMVPs.length || 1; // avoid divide by zero
-  const percentage = Math.round((score / totalMVPs) * 100);
+  const totalMVPs = allMVPs.length || 1;
 
-  return (
-    <div className="mvp-speed-game">
-      <Navbar onLogout={handleLogout} />
-
-      <div className="game-container">
-        {gameState === 'pre' && (
-          <div className="pre-game-screen">
-            <div className="timer-display-large">
-              <div className="timer-number">60</div>
-              <div className="timer-label">seconds</div>
-            </div>
-            <h1 className="ready-heading">Ready?</h1>
-            <p className="instructions">
-              Type the <strong>FULL NAME</strong> of as many MVP winners as you can remember.<br />
-              (e.g., "Michael Jordan", not just "Jordan")<br />
-              Press Enter after each name.
-            </p>
-            <button className="btn btn-orange btn-large pulse" onClick={startGame}>
-              Start Challenge
-            </button>
-          </div>
-        )}
-
-        {gameState === 'playing' && (
-          <div className="playing-screen">
-            <div className="timer-display">
-              <div className={`timer-number ${timeLeft <= 10 ? 'timer-warning' : ''}`}>
-                {timeLeft}
-              </div>
-              <div className="timer-label">seconds left</div>
-            </div>
-
-            <div className="input-section">
-              <input
-                ref={inputRef}
-                type="text"
-                className="game-input"
-                placeholder="Type MVP name and press Enter..."
-                value={input}
-                onChange={handleInputChange}
-                onKeyPress={handleKeyPress}
-                autoFocus
-              />
-            </div>
-
-            <div className="score-display">
-              <div className="score-value">{score} / {totalMVPs}</div>
-              <div className="score-label">Unique MVPs Found</div>
-            </div>
-
-            <div className="correct-answers">
-              {correctAnswers.map((answer, index) => (
-                <div key={index} className="answer-chip correct">
-                  ✓ {answer}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {gameState === 'post' && (
-          <div className="post-game-screen">
-            <h1 className="time-up">Time's Up!</h1>
-            <div className="stat-box">
-              <div className="stat-label">Progress</div>
-              <div className="stat-value">{score} / {totalMVPs}</div>
-            </div>
-            <div className="score-percentage">
-              That's {percentage}% of all unique MVPs
-            </div>
-
-            {score >= personalBest && score > 0 && (
-              <div className="new-record">
-                🎉 New Personal Best! 🎉
-              </div>
-            )}
-
+  // --- VIEW: POST GAME ---
+  if (gameState === 'post') {
+    return (
+      <div className="mvp-speed-game">
+        <Navbar onLogout={() => navigate('/login')} />
+        <div className="game-container">
+          <GameResults
+            title="Time's Up!"
+            score={score}
+            total={totalMVPs}
+            points={score} /* 1 pt per MVP */
+            gameMode="mvp_speed"
+          >
+            {/* Custom Breakdown for Speed Mode */}
             <div className="results-breakdown">
+              {score >= personalBest && score > 0 && (
+                <div className="new-record">
+                  🎉 New Personal Best! 🎉
+                </div>
+              )}
+
               <div className="breakdown-section">
                 <h3>Correct Answers ({score})</h3>
                 <div className="answers-list">
@@ -317,21 +214,86 @@ function MVPSpeedChallenge() {
                 </div>
               </div>
             </div>
+          </GameResults>
+        </div>
+      </div>
+    );
+  }
 
-            <div className="game-actions">
-              <button className="btn btn-orange" onClick={startGame}>
-                Try Again
-              </button>
-              <Link to="/dashboard" className="btn btn-secondary">
-                Back to Dashboard
-              </Link>
+  // --- VIEW: PRE GAME ---
+  if (gameState === 'pre') {
+    return (
+      <div className="mvp-speed-game">
+        <Navbar onLogout={() => navigate('/login')} />
+        <div className="game-container">
+          <div className="pre-game-screen">
+            <div className="timer-display-large">
+              <div className="timer-number">60</div>
+              <div className="timer-label">seconds</div>
             </div>
+            <h1 className="ready-heading">Ready?</h1>
+            <p className="instructions">
+              Type the <strong>FULL NAME</strong> of as many MVP winners as possible.<br />
+              (e.g., "Michael Jordan")<br />
+              Press Enter after each name.
+            </p>
+            <button className="btn btn-orange btn-large pulse" onClick={startGame}>
+              Start Challenge
+            </button>
           </div>
-        )}
+        </div>
+      </div>
+    );
+  }
+
+  // --- VIEW: PLAYING ---
+  // Determine timer class
+  let timerClass = 'timer-number';
+  if (timeLeft <= 10) {
+    timerClass += ' timer-warning';
+  }
+
+  return (
+    <div className="mvp-speed-game">
+      <Navbar onLogout={() => navigate('/login')} />
+      <div className="game-container">
+        <div className="playing-screen">
+          <div className="timer-display">
+            <div className={timerClass}>
+              {timeLeft}
+            </div>
+            <div className="timer-label">seconds left</div>
+          </div>
+
+          <div className="input-section">
+            <input
+              ref={inputRef}
+              type="text"
+              className="game-input"
+              placeholder="Type MVP name and press Enter..."
+              value={input}
+              onChange={handleInputChange}
+              onKeyPress={handleKeyPress}
+              autoFocus
+            />
+          </div>
+
+          <div className="score-display">
+            <div className="score-value">{score} / {totalMVPs}</div>
+            <div className="score-label">Unique MVPs Found</div>
+          </div>
+
+          <div className="correct-answers">
+            {correctAnswers.map((answer, index) => (
+              <div key={index} className="answer-chip correct">
+                ✓ {answer}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
 export default MVPSpeedChallenge;
-

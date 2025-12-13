@@ -1,3 +1,4 @@
+
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 
@@ -5,6 +6,7 @@ import { useState, useEffect } from 'react';
 import Cookies from 'js-cookie';
 import { supabase } from '../supabaseClient';
 import './Profile.css';
+
 
 function Profile({ onLogout }) {
   const navigate = useNavigate();
@@ -19,11 +21,10 @@ function Profile({ onLogout }) {
   const [gameModeStats, setGameModeStats] = useState({
     mvpSpeed: { best: 0, gamesPlayed: 0 },
     trivia: { gamesPlayed: 0 },
-    history: { accuracy: 0, gamesPlayed: 0 },
+    history: { accuracy: 0, gamesPlayed: 0, questionsAnswered: 0, totalQuestions: 0 },
     guessPlayer: { gamesPlayed: 0 }
   });
 
-  const [recentActivity, setRecentActivity] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -37,6 +38,7 @@ function Profile({ onLogout }) {
       return null;
     }
   };
+
 
   const fetchProfileData = async () => {
     try {
@@ -52,7 +54,6 @@ function Profile({ onLogout }) {
         return;
       }
       const userId = decoded.id;
-
       const { data: userData } = await supabase
         .from('users')
         .select('*')
@@ -66,7 +67,6 @@ function Profile({ onLogout }) {
           joinDate: new Date(userData.created_at).toLocaleDateString()
         });
       }
-
 
       const { data: globalStats } = await supabase
         .from('user_global_stats')
@@ -83,31 +83,28 @@ function Profile({ onLogout }) {
         });
       }
 
-
       const { data: modeStats } = await supabase
         .from('user_game_mode_stats')
         .select('*')
         .eq('user_id', userId);
 
       if (modeStats) {
-        // Simple mapping manually
         let mvpBest = 0;
+        let mvpGames = 0;
         let historyAcc = 0;
 
         modeStats.forEach(mode => {
           if (mode.game_mode === 'mvp_speed') {
-            mvpBest = mode.best_score;
+            mvpBest = mode.best_score || 0;
+            mvpGames = mode.games_played || 0;
           }
-          // Add more mappings here simply
         });
 
         setGameModeStats(prev => ({
           ...prev,
-          mvpSpeed: { ...prev.mvpSpeed, best: mvpBest }
+          mvpSpeed: { ...prev.mvpSpeed, best: mvpBest, gamesPlayed: mvpGames }
         }));
       }
-
-
 
       setLoading(false);
 
@@ -126,7 +123,7 @@ function Profile({ onLogout }) {
       <Navbar onLogout={onLogout} />
 
       <div className="profile-content">
-        {/* Profile Header */}
+
         <div className="profile-header">
           <div className="profile-avatar-large"></div>
           <div className="profile-info">
@@ -136,7 +133,7 @@ function Profile({ onLogout }) {
           </div>
         </div>
 
-        {/* Overall Stats */}
+
         <div className="stats-section">
           <h2 className="section-title">Overall Statistics</h2>
           <div className="stats-grid">
@@ -171,7 +168,6 @@ function Profile({ onLogout }) {
           </div>
         </div>
 
-        {/* Per Game Mode Stats */}
         <div className="game-mode-stats-section">
           <h2 className="section-title">Per Game Mode Performance</h2>
           <div className="game-stats-grid">
@@ -217,12 +213,7 @@ function Profile({ onLogout }) {
           </div>
         </div>
 
-
-
-        {/* Recent Activity - Removed as per user request */}
-        {/* <div className="activity-section"> ... </div> */}
-
-        {/* Back to Dashboard */}
+        {/* Actions */}
         <div className="profile-actions">
           <Link to="/dashboard" className="btn btn-primary">
             Back to Dashboard
@@ -234,4 +225,3 @@ function Profile({ onLogout }) {
 }
 
 export default Profile;
-

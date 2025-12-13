@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, ArrowLeft, Key } from 'lucide-react';
-import './Login.css'; // Reuse Login styles
+import './Login.css';
 
 function ForgotPassword() {
-    const [step, setStep] = useState(1); // 1: Email, 2: Security Question
+    const [step, setStep] = useState(1);
     const [email, setEmail] = useState('');
     const [securityQuestion, setSecurityQuestion] = useState('');
     const [securityAnswer, setSecurityAnswer] = useState('');
@@ -29,11 +29,6 @@ function ForgotPassword() {
             const data = await response.json();
 
             if (!response.ok) {
-                // If user not found, we purposefully simulate success or give generic error
-                // based on privacy setting. But for Trivia app context, we'll err on UX.
-                // However, without a question, we can't really proceed to step 2 logically.
-                // So we might say "Account not found" or handle it delicately.
-                // For simplicity/UX:
                 throw new Error(data.message || 'Account not found');
             }
 
@@ -71,7 +66,7 @@ function ForgotPassword() {
             }
 
             setMessage('Success! A password reset link has been sent to your email.');
-            setStep(3); // 3: Success state
+            setStep(3);
 
         } catch (err) {
             setError(err.message);

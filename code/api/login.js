@@ -21,14 +21,13 @@ export default async function handler(req, res) {
         return res.status(400).json({ message: 'Missing username or password' });
     }
 
-    // Comprehensive XSS Protection
+    // Prevent script injection attacks by blocking common HTML/JS patterns
     const xssPattern = /(<script)|(<iframe)|(<object)|(<embed)|(<link)|(on\w+\s*=)|(javascript:)|(vbscript:)/i;
     if (xssPattern.test(username)) {
         return res.status(400).json({ message: 'Invalid input detected (XSS protection)' });
     }
 
     try {
-        // 1. Fetch User
         const { data: user, error: fetchError } = await supabase
             .from('users')
             .select('*')
@@ -39,7 +38,7 @@ export default async function handler(req, res) {
             return res.status(401).json({ message: 'Invalid username or password' });
         }
 
-        // 2. Check Lockout Status
+        // Check if account is temporarily locked from too many failed attempts
         if (user.lockout_until && new Date(user.lockout_until) > new Date()) {
             const waitTime = Math.ceil((new Date(user.lockout_until) - new Date()) / 60000);
             return res.status(429).json({
@@ -48,20 +47,19 @@ export default async function handler(req, res) {
             });
         }
 
-        // 3. Verify Password
         const validPassword = await bcrypt.compare(password, user.password_hash);
+
         if (!validPassword) {
-            // Increment failed attempts
+            // Track failed attempts to prevent brute force attacks
             const newFailedAttempts = (user.failed_login_attempts || 0) + 1;
             let updateData = { failed_login_attempts: newFailedAttempts };
 
-            // Lockout after 5 attempts
+            // Lock account for 15 minutes after 5 failed attempts
             if (newFailedAttempts >= 5) {
-                const lockoutTime = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 minutes
+                const lockoutTime = new Date(Date.now() + 15 * 60 * 1000).toISOString();
                 updateData.lockout_until = lockoutTime;
             }
 
-            // Update user record with failure
             await supabase
                 .from('users')
                 .update(updateData)
@@ -78,15 +76,19 @@ export default async function handler(req, res) {
             }
         }
 
-        // 3. Generate Token
+
         const token = jwt.sign(
-            { id: user.id, username: user.username, email: user.email },
+            {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                role: (user.role || 'user').trim().toLowerCase()
+            },
             JWT_SECRET,
             { expiresIn: '7d' }
         );
 
-        // 4. Update Last Active
-        // 5. Update Last Active & Reset Failed Attempts
+        // Clear failed attempts on successful login
         await supabase
             .from('users')
             .update({
@@ -96,7 +98,14 @@ export default async function handler(req, res) {
             })
             .eq('id', user.id);
 
-        return res.status(200).json({ token, user: { username: user.username, email: user.email } });
+        return res.status(200).json({
+            token,
+            user: {
+                username: user.username,
+                email: user.email,
+                role: (user.role || 'user').trim().toLowerCase()
+            }
+        });
 
     } catch (error) {
         console.error('Login API Error:', error);

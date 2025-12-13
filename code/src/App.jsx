@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Cookies from 'js-cookie';
@@ -8,15 +9,18 @@ import MVPSpeedChallenge from './pages/games/MVPSpeedChallenge';
 import NBAHistoryQuiz from './pages/games/NBAHistoryQuiz';
 import NBATrivia from './pages/games/NBATrivia';
 import GuessThePlayer from './pages/games/GuessThePlayer';
+import AdminDashboard from './pages/AdminDashboard';
 
 import Profile from './pages/Profile';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import './App.css';
 
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
+
 
   useEffect(() => {
     const token = Cookies.get('auth_token');
@@ -45,13 +49,13 @@ function App() {
         <Route
           path="/login"
           element={
-            isAuthenticated ? <Navigate to="/dashboard" /> : <Login onLogin={handleLogin} />
+            isAuthenticated ? <RedirectWithRole /> : <Login onLogin={handleLogin} />
           }
         />
         <Route
           path="/register"
           element={
-            isAuthenticated ? <Navigate to="/dashboard" /> : <Register onLogin={handleLogin} />
+            isAuthenticated ? <RedirectWithRole /> : <Register onLogin={handleLogin} />
           }
         />
         <Route
@@ -66,12 +70,20 @@ function App() {
             isAuthenticated ? <Navigate to="/dashboard" /> : <ResetPassword />
           }
         />
+
         <Route
           path="/dashboard"
           element={
             isAuthenticated ? <Dashboard onLogout={handleLogout} /> : <Navigate to="/login" />
           }
         />
+        <Route
+          path="/profile"
+          element={
+            isAuthenticated ? <Profile onLogout={handleLogout} /> : <Navigate to="/login" />
+          }
+        />
+
         <Route
           path="/game/mvp-speed"
           element={
@@ -96,16 +108,53 @@ function App() {
             isAuthenticated ? <GuessThePlayer /> : <Navigate to="/login" />
           }
         />
+
         <Route
-          path="/profile"
+          path="/admin"
           element={
-            isAuthenticated ? <Profile onLogout={handleLogout} /> : <Navigate to="/login" />
+            isAuthenticated ? (
+              <AdminRoute>
+                <AdminDashboard />
+              </AdminRoute>
+            ) : <Navigate to="/login" />
           }
         />
-        <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} />
+
+
+        <Route path="/" element={<Navigate to={isAuthenticated ? (getUserRole() === 'admin' ? "/admin" : "/dashboard") : "/login"} />} />
       </Routes>
     </Router>
   );
+}
+
+
+function getUserRole() {
+  const token = Cookies.get('auth_token');
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.role ? payload.role.toLowerCase() : 'user';
+  } catch (e) {
+    return null;
+  }
+}
+
+
+function RedirectWithRole() {
+  const role = getUserRole();
+  if (role === 'admin') {
+    return <Navigate to="/admin" />;
+  }
+  return <Navigate to="/dashboard" />;
+}
+
+
+function AdminRoute({ children }) {
+  const role = getUserRole();
+  if (role !== 'admin') {
+    return <Navigate to="/dashboard" />;
+  }
+  return children;
 }
 
 export default App;

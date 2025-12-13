@@ -1,11 +1,7 @@
+
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
-
-console.log("forgot-password env check:", {
-    hasUrl: !!process.env.VITE_SUPABASE_URL,
-    hasAnonKey: !!process.env.VITE_SUPABASE_ANON_KEY
-});
 
 const supabase = createClient(
     process.env.VITE_SUPABASE_URL,
@@ -23,14 +19,13 @@ export default async function handler(req, res) {
         return res.status(400).json({ message: 'Email is required' });
     }
 
-
+    // secutity check
     const xssPattern = /(<script)|(<iframe)|(<object)|(<embed)|(<link)|(on\w+\s*=)|(javascript:)|(vbscript:)/i;
     if (xssPattern.test(email) || (securityAnswer && xssPattern.test(securityAnswer))) {
         return res.status(400).json({ message: 'Invalid input detected' });
     }
 
     try {
-
         const { data: user } = await supabase
             .from('users')
             .select('id, email, security_answer, lockout_until, failed_login_attempts')
@@ -41,7 +36,7 @@ export default async function handler(req, res) {
             return res.status(400).json({ message: 'Account not found' });
         }
 
-
+        //  Lockout Check
         if (user.lockout_until && new Date(user.lockout_until) > new Date()) {
             const waitTime = Math.ceil((new Date(user.lockout_until) - new Date()) / 60000);
             return res.status(429).json({
@@ -56,16 +51,14 @@ export default async function handler(req, res) {
             }
 
             if (!securityAnswer || user.security_answer.toLowerCase().trim() !== securityAnswer.toLowerCase().trim()) {
-
+                // Tracking Failed Security Question attempts
                 const newFailedAttempts = (user.failed_login_attempts || 0) + 1;
                 let updateData = { failed_login_attempts: newFailedAttempts };
 
-
                 if (newFailedAttempts >= 5) {
-                    const lockoutTime = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 minutes
+                    const lockoutTime = new Date(Date.now() + 15 * 60 * 1000).toISOString();
                     updateData.lockout_until = lockoutTime;
                 }
-
 
                 await supabase
                     .from('users')
@@ -83,17 +76,15 @@ export default async function handler(req, res) {
             }
         }
 
-        // Reset failed attempts on success
         await supabase
             .from('users')
             .update({ failed_login_attempts: 0, lockout_until: null })
             .eq('id', user.id);
 
-        //  Generate Token
+        // Generate Secure Token
         const token = crypto.randomBytes(32).toString('hex');
-        const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 Hour Expiry
 
-        //  Save to Database
         const { error: insertError } = await supabase
             .from('password_resets')
             .insert({
@@ -104,10 +95,9 @@ export default async function handler(req, res) {
 
         if (insertError) throw insertError;
 
-        // Send Email via Nodemailer
         const resetLink = `http://localhost:3000/reset-password?token=${token}`;
 
-        // Create Transporter
+        // Email Dispatch
         if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
             const transporter = nodemailer.createTransport({
                 service: 'gmail',

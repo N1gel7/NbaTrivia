@@ -1,9 +1,13 @@
+
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Clock, Flame, TrendingUp, Award, BookOpen, Trophy, UserCircle, Star, ArrowRight, BarChart3 } from 'lucide-react';
+import { Clock, Flame, TrendingUp, Award, BookOpen, Trophy, UserCircle, BarChart3 } from 'lucide-react';
 import Cookies from 'js-cookie';
 import { supabase } from '../supabaseClient';
 import Navbar from '../components/Navbar';
+import Skeleton from '../components/Skeleton';
+import StatCard from '../components/dashboard/StatCard';
+import GameModeCard from '../components/dashboard/GameModeCard';
+import LeaderboardRow from '../components/dashboard/LeaderboardRow';
 import './Dashboard.css';
 
 function Dashboard({ onLogout }) {
@@ -23,7 +27,6 @@ function Dashboard({ onLogout }) {
   });
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
-
   const [animatedStats, setAnimatedStats] = useState({
     totalQuestions: 0,
     dailyStreak: 0,
@@ -45,23 +48,23 @@ function Dashboard({ onLogout }) {
 
   const fetchDashboardData = async () => {
     try {
-      // 1. Get User ID from Token
       const token = Cookies.get('auth_token');
       if (!token) {
         setLoading(false);
         return;
       }
+
       const decoded = decodeJwt(token);
       const userId = decoded?.id;
       const username = decoded?.username;
+
       if (!userId) {
         setLoading(false);
         return;
       }
 
-      setCurrentUser({ username }); // Basic info for UI if needed
+      setCurrentUser({ username });
 
-      // 2. Fetch User Global Stats
       let { data: globalStats } = await supabase
         .from('user_global_stats')
         .select('*')
@@ -69,26 +72,15 @@ function Dashboard({ onLogout }) {
         .single();
 
       if (!globalStats) {
-        // Init stats if missing
         globalStats = { total_questions: 0, daily_streak: 0, avg_score: 0, current_rank: 0 };
       }
 
-      // Calculate Rank (simple count of users with more points)
       const { count: rankCount } = await supabase
         .from('user_global_stats')
         .select('user_id', { count: 'exact', head: true })
         .gt('total_points', globalStats.total_points || 0);
 
       const realRank = (rankCount || 0) + 1;
-
-      setStats({
-        totalQuestions: globalStats.total_questions,
-        dailyStreak: globalStats.daily_streak,
-        avgScore: globalStats.avg_score,
-        currentRank: realRank
-      });
-
-      // 3. Fetch Game Mode Stats
       const { data: modes } = await supabase
         .from('user_game_mode_stats')
         .select('*')
@@ -109,9 +101,8 @@ function Dashboard({ onLogout }) {
           if (m.game_mode === 'guess_player') newGameStats.guessPlayer.best = m.best_score || 0;
         });
       }
-      setGameStats(newGameStats);
 
-      // 4. Fetch Leaderboard (Top 10)
+      setGameStats(newGameStats);
       const { data: topUsers } = await supabase
         .from('user_global_stats')
         .select(`
@@ -134,8 +125,6 @@ function Dashboard({ onLogout }) {
       }
 
       setLoading(false);
-
-      // Trigger animations
       startAnimations({
         totalQuestions: globalStats.total_questions,
         dailyStreak: globalStats.daily_streak,
@@ -150,179 +139,137 @@ function Dashboard({ onLogout }) {
   };
 
   const startAnimations = (finalStats) => {
-    const duration = 1500;
     const steps = 60;
+    const duration = 1500;
     const stepDuration = duration / steps;
+    const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
 
-    const easeOutCubic = (t) => {
-      return 1 - Math.pow(1 - t, 3);
-    };
-
-    const animateValue = (start, end, callback) => {
-      const range = end - start;
+    const animate = (key, endValue) => {
       let step = 0;
-
       const timer = setInterval(() => {
         step++;
-        const progress = step / steps;
-        const easedProgress = easeOutCubic(progress);
-        const current = start + range * easedProgress;
+        const progress = easeOutCubic(step / steps);
+        const current = Math.floor(endValue * progress);
+
+        setAnimatedStats(prev => ({
+          ...prev,
+          [key]: current
+        }));
 
         if (step >= steps) {
-          callback(end);
+          setAnimatedStats(prev => ({ ...prev, [key]: endValue }));
           clearInterval(timer);
-        } else {
-          callback(Math.floor(current));
         }
       }, stepDuration);
     };
 
-    animateValue(0, finalStats.totalQuestions || 0, (val) => {
-      setAnimatedStats(prev => ({ ...prev, totalQuestions: val }));
-    });
-
-    animateValue(0, finalStats.dailyStreak || 0, (val) => {
-      setAnimatedStats(prev => ({ ...prev, dailyStreak: val }));
-    });
-
-    animateValue(0, finalStats.avgScore || 0, (val) => {
-      setAnimatedStats(prev => ({ ...prev, avgScore: val }));
-    });
-
-    animateValue(0, finalStats.currentRank || 0, (val) => {
-      setAnimatedStats(prev => ({ ...prev, currentRank: val }));
-    });
+    animate('totalQuestions', finalStats.totalQuestions || 0);
+    animate('dailyStreak', finalStats.dailyStreak || 0);
+    animate('avgScore', finalStats.avgScore || 0);
+    animate('currentRank', finalStats.currentRank || 0);
   };
 
   if (loading) {
-    return <div className="dashboard-loading"><div className="loading-spinner"></div></div>;
+    return (
+      <div className="dashboard">
+        <Navbar onLogout={() => { }} />
+        <div className="dashboard-content">
+          <div className="stats-section">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="stat-card" style={{ height: '160px' }}>
+                <Skeleton type="text" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="dashboard">
-
-      <div style={{ position: 'fixed', top: '0', left: '0', width: '600px', height: '600px', background: 'radial-gradient(circle, rgba(29, 66, 138, 0.08) 0%, transparent 70%)', filter: 'blur(80px)', zIndex: -1, pointerEvents: 'none' }} />
-      <div style={{ position: 'fixed', bottom: '0', right: '0', width: '600px', height: '600px', background: 'radial-gradient(circle, rgba(255, 107, 53, 0.08) 0%, transparent 70%)', filter: 'blur(100px)', zIndex: -1, pointerEvents: 'none' }} />
+      <div className="dashboard-bg-left" />
+      <div className="dashboard-bg-right" />
 
       <Navbar onLogout={onLogout} />
+
       <div className="dashboard-content">
+
         <div className="stats-section">
-          <div className="stat-card stat-card-1 fade-in" style={{ animationDelay: '0ms' }}>
-            <div className="stat-icon-wrapper">
-              <BarChart3 className="stat-icon" size={24} strokeWidth={2.5} color="#1d428a" />
-            </div>
-            <div className="stat-content">
-              <div className="stat-label">Questions Answered</div>
-              <div className="stat-value">{animatedStats.totalQuestions}</div>
-            </div>
-          </div>
-
-          <div className="stat-card stat-card-2 fade-in" style={{ animationDelay: '100ms' }}>
-            <div className="stat-icon-wrapper">
-              <Flame className="stat-icon flame-pulse" size={24} strokeWidth={2.5} color="#ff6b35" />
-            </div>
-            <div className="stat-content">
-              <div className="stat-label">Daily Streak</div>
-              <div className="stat-value">{animatedStats.dailyStreak}</div>
-            </div>
-          </div>
-
-          <div className="stat-card stat-card-3 fade-in" style={{ animationDelay: '200ms' }}>
-            <div className="stat-icon-wrapper">
-              <TrendingUp className="stat-icon" size={24} strokeWidth={2.5} color="#1d428a" />
-            </div>
-            <div className="stat-content">
-              <div className="stat-label">Average Score</div>
-              <div className="stat-value">{animatedStats.avgScore}%</div>
-            </div>
-          </div>
-
-          <div className="stat-card stat-card-4 fade-in" style={{ animationDelay: '300ms' }}>
-            <div className="stat-icon-wrapper">
-              <Award className="stat-icon" size={24} strokeWidth={2.5} color="#b45309" />
-            </div>
-            <div className="stat-content">
-              <div className="stat-label">Current Rank</div>
-              <div className="stat-value">#{animatedStats.currentRank}</div>
-            </div>
-          </div>
+          <StatCard
+            Icon={BarChart3} iconColor="#1d428a"
+            label="Questions Answered"
+            value={animatedStats.totalQuestions}
+            delay={0} className="stat-card-1"
+          />
+          <StatCard
+            Icon={Flame} iconColor="#ff6b35"
+            label="Daily Streak"
+            value={animatedStats.dailyStreak}
+            delay={100} className="stat-card-2"
+          />
+          <StatCard
+            Icon={TrendingUp} iconColor="#1d428a"
+            label="Average Score"
+            value={`${animatedStats.avgScore}%`}
+            delay={200} className="stat-card-3"
+          />
+          <StatCard
+            Icon={Award} iconColor="#b45309"
+            label="Current Rank"
+            value={`#${animatedStats.currentRank}`}
+            delay={300} className="stat-card-4"
+          />
         </div>
 
-        {/* Game Modes Section */}
         <div className="game-modes-section">
           <h2 className="section-title">Game Modes</h2>
           <div className="game-modes-grid">
-            <Link to="/game/mvp-speed" className="game-mode-card card-mvp-speed fade-in" style={{ animationDelay: '400ms' }}>
-              <div className="card-icon-wrapper">
-                <Clock className="card-icon" size={32} strokeWidth={2} />
-              </div>
-              <h3 className="card-title">MVP Speed Challenge</h3>
-              <p className="card-description">Name as many MVPs as you can in 60 seconds. Race against the clock!</p>
-              <div className="personal-best-badge">
-                <Star className="star-icon" size={12} fill="currentColor" />
-                <span>Personal Best: {gameStats.mvpSpeed.best} MVPs</span>
-              </div>
-              <button className="btn-play group" type="button">
-                <span>Play Now</span>
-                <ArrowRight className="arrow-icon" size={18} strokeWidth={2.5} />
-              </button>
-            </Link>
-
-            <Link to="/game/history" className="game-mode-card card-history fade-in" style={{ animationDelay: '500ms' }}>
-              <div className="card-icon-wrapper">
-                <BookOpen className="card-icon" size={32} strokeWidth={2} />
-              </div>
-              <h3 className="card-title">NBA History</h3>
-              <p className="card-description">Deep dive into the archives. Answer questions from different eras.</p>
-              <div className="personal-best-badge">
-                <Star className="star-icon" size={12} fill="currentColor" />
-                <span>Personal Best: {gameStats.history.best}/10 Correct</span>
-              </div>
-              <button className="btn-play group" type="button">
-                <span>Play Now</span>
-                <ArrowRight className="arrow-icon" size={18} strokeWidth={2.5} />
-              </button>
-            </Link>
-
-            <Link to="/game/trivia" className="game-mode-card card-trivia fade-in" style={{ animationDelay: '600ms' }}>
-              <div className="card-icon-wrapper">
-                <Trophy className="card-icon" size={32} strokeWidth={2} />
-              </div>
-              <h3 className="card-title">NBA Trivia</h3>
-              <p className="card-description">The ultimate test of basketball knowledge. Random questions from all categories.</p>
-              <div className="personal-best-badge">
-                <Star className="star-icon" size={12} fill="currentColor" />
-                <span>Personal Best: {gameStats.trivia.best} Points</span>
-              </div>
-              <button className="btn-play group" type="button">
-                <span>Play Now</span>
-                <ArrowRight className="arrow-icon" size={18} strokeWidth={2.5} />
-              </button>
-            </Link>
-
-            <Link to="/game/guess-player" className="game-mode-card card-guess fade-in" style={{ animationDelay: '700ms' }}>
-              <div className="card-icon-wrapper">
-                <UserCircle className="card-icon" size={32} strokeWidth={2} />
-              </div>
-              <h3 className="card-title">Who Am I?</h3>
-              <p className="card-description">Identify the player based on career stats, teams, and achievements.</p>
-              <div className="personal-best-badge">
-                <Star className="star-icon" size={12} fill="currentColor" />
-                <span>Personal Best: {gameStats.guessPlayer.best} Points</span>
-              </div>
-              <button className="btn-play group" type="button">
-                <span>Play Now</span>
-                <ArrowRight className="arrow-icon" size={18} strokeWidth={2.5} />
-              </button>
-            </Link>
+            <GameModeCard
+              to="/game/mvp-speed"
+              Icon={Clock}
+              title="MVP Speed Challenge"
+              description="Name as many MVPs as you can in 60 seconds. Race against the clock!"
+              bestScore={gameStats.mvpSpeed.best}
+              bestLabel="MVPs"
+              delay={400}
+              className="card-mvp-speed"
+            />
+            <GameModeCard
+              to="/game/history"
+              Icon={BookOpen}
+              title="NBA History"
+              description="Deep dive into the archives. Answer questions from different eras."
+              bestScore={gameStats.history.best}
+              bestLabel="/10 Correct"
+              delay={500}
+              className="card-history"
+            />
+            <GameModeCard
+              to="/game/trivia"
+              Icon={Trophy}
+              title="NBA Trivia"
+              description="The ultimate test of basketball knowledge. Random questions from all categories."
+              bestScore={gameStats.trivia.best}
+              bestLabel="Points"
+              delay={600}
+              className="card-trivia"
+            />
+            <GameModeCard
+              to="/game/guess-player"
+              Icon={UserCircle}
+              title="Who Am I?"
+              description="Identify the player based on career stats, teams, and achievements."
+              bestScore={gameStats.guessPlayer.best}
+              bestLabel="Points"
+              delay={700}
+              className="card-guess"
+            />
           </div>
         </div>
 
-        {/* Leaderboard Section */}
         <div className="leaderboard-section">
           <h2 className="section-title">Leaderboard</h2>
-
-
           <div className="leaderboard-table-container">
             <div className="leaderboard-header-row">
               <div className="col-rank">Rank</div>
@@ -332,36 +279,16 @@ function Dashboard({ onLogout }) {
               <div className="col-active">Last Active</div>
             </div>
 
-            {leaderboard.map((user, index) => {
-              const isCurrentUser = currentUser && user.username === currentUser.username;
-              return (
-                <div
-                  key={index}
-                  className={`leaderboard-row ${isCurrentUser ? 'current-user' : ''}`}
-                >
-                  <div className="col-rank">
-                    {user.rank === 1 && (
-                      <div className="rank-badge rank-first">1</div>
-                    )}
-                    {user.rank === 2 && (
-                      <div className="rank-badge rank-second">2</div>
-                    )}
-                    {user.rank === 3 && (
-                      <div className="rank-badge rank-third">3</div>
-                    )}
-                    {user.rank > 3 && (
-                      <div className="rank-badge rank-other">{user.rank}</div>
-                    )}
-                  </div>
-                  <div className="col-player">{user.username}</div>
-                  <div className="col-points">{user.points ? user.points.toLocaleString() : 0}</div>
-                  <div className="col-avg">{user.avgScore}%</div>
-                  <div className="col-active">{user.lastActive}</div>
-                </div>
-              );
-            })}
+            {leaderboard.map((user, index) => (
+              <LeaderboardRow
+                key={index}
+                user={user}
+                isCurrentUser={currentUser && user.username === currentUser.username}
+              />
+            ))}
           </div>
         </div>
+
       </div>
     </div>
   );

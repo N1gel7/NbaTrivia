@@ -18,8 +18,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ message: 'Missing required fields' });
     }
 
-    // Comprehensive XSS Protection
-    // Blocks <script>, <iframe/object/embed>, on* events, and js/vbscript protocols
+    // Prevent script injection attacks by blocking common HTML/JS patterns
     const xssPattern = /(<script)|(<iframe)|(<object)|(<embed)|(<link)|(on\w+\s*=)|(javascript:)|(vbscript:)/i;
     if (
         xssPattern.test(username) ||
@@ -32,15 +31,14 @@ export default async function handler(req, res) {
         return res.status(400).json({ message: 'Invalid input detected (XSS protection)' });
     }
 
-    // Strong Password Validation
-    // Min 8 chars, 1 upper, 1 lower, 1 number, 1 special
+
     const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
     if (!strongPasswordRegex.test(password)) {
         return res.status(400).json({ message: 'Password is too weak. Must be 8+ chars with uppercase, lowercase, number, and special char.' });
     }
 
     try {
-        // 1. Check for existing users
+        // Uniqueness Check
         const { data: existingUsers, error: checkError } = await supabase
             .from('users')
             .select('username, email')
@@ -57,11 +55,10 @@ export default async function handler(req, res) {
             }
         }
 
-        // 2. Hash Password
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // 3. Insert User
+        // Create User
         const { data: newUser, error: insertError } = await supabase
             .from('users')
             .insert([{
@@ -78,7 +75,7 @@ export default async function handler(req, res) {
 
         if (insertError) throw insertError;
 
-        // 4. Initialize user_global_stats
+        // Initialize Stats
         if (newUser) {
             await supabase
                 .from('user_global_stats')

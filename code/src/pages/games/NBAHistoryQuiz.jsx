@@ -1,22 +1,33 @@
+
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import Navbar from '../../components/Navbar';
+import Skeleton from '../../components/Skeleton';
+import GameQuestion from '../../components/game/GameQuestion';
+import GameResults from '../../components/game/GameResults';
+import QuestionReviewList from '../../components/game/QuestionReviewList';
 import { supabase } from '../../supabaseClient';
+import { soundManager } from '../../utils/soundManager';
+import { celebratePerfectScore, celebrateGameComplete } from '../../utils/confetti';
 import './NBAHistoryQuiz.css';
 
 function NBAHistoryQuiz() {
+  // 1. STATE
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [showResult, setShowResult] = useState(false);
   const [score, setScore] = useState(0);
+  const [totalPoints, setTotalPoints] = useState(0);
   const [answers, setAnswers] = useState([]);
   const [gameComplete, setGameComplete] = useState(false);
-  const navigate = useNavigate();
 
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const navigate = useNavigate();
+
+  // 2. EFFECTS
   useEffect(() => {
     fetchQuestions();
   }, []);
@@ -24,110 +35,18 @@ function NBAHistoryQuiz() {
   useEffect(() => {
     if (gameComplete) {
       saveGameStats();
+      if (score === questions.length) {
+        celebratePerfectScore();
+      } else {
+        celebrateGameComplete();
+      }
+      soundManager.play('complete');
     }
   }, [gameComplete]);
 
-  const decodeJwt = (token) => {
-    try {
-      return JSON.parse(atob(token.split('.')[1]));
-    } catch (e) {
-      return null;
-    }
-  };
-
-  const saveGameStats = async () => {
-    const token = Cookies.get('auth_token');
-    if (!token) return;
-
-    const decoded = decodeJwt(token);
-    const userId = decoded?.id;
-    if (!userId) return;
-
-    try {
-      // 1. Update Game Mode Stats
-      const { data: existing } = await supabase
-        .from('user_game_mode_stats')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('game_mode', 'history')
-        .single();
-
-      const newGamesPlayed = (existing?.games_played || 0) + 1;
-      // You could track accuracy here if db supports it, for now just basic usage
-
-      await supabase
-        .from('user_game_mode_stats')
-        .upsert({
-          user_id: userId,
-          game_mode: 'history',
-          games_played: newGamesPlayed,
-          best_score: Math.max(existing?.best_score || 0, score)
-        }, { onConflict: 'user_id, game_mode' });
-
-
-      // 2. Update Global Stats
-      const { data: global } = await supabase
-        .from('user_global_stats')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-
-      const totalQuestions = (global?.total_questions || 0) + 10;
-      const currentPoints = (global?.total_points || 0) + (score * 100);
-
-      // Calculate average score (percentage based on correct answers)
-      const percentageThisGame = Math.round((score / 10) * 100); // score out of 10 questions
-      const previousAvg = global?.avg_score || 0;
-      const gamesPlayed = Math.floor((global?.total_questions || 0) / 10) + 1;
-      const newAvgScore = Math.round(((previousAvg * (gamesPlayed - 1)) + percentageThisGame) / gamesPlayed);
-
-      // Calculate daily streak based on last_played date
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-      let dailyStreak = 1;
-      if (global?.last_played) {
-        const lastPlayed = new Date(global.last_played);
-        const lastPlayedDate = new Date(lastPlayed.getFullYear(), lastPlayed.getMonth(), lastPlayed.getDate());
-        const daysDiff = Math.floor((today - lastPlayedDate) / (1000 * 60 * 60 * 24));
-
-        if (daysDiff === 0) {
-          dailyStreak = global.daily_streak || 1;
-        } else if (daysDiff === 1) {
-          dailyStreak = (global.daily_streak || 0) + 1;
-        }
-      }
-
-      await supabase
-        .from('user_global_stats')
-        .upsert({
-          user_id: userId,
-          total_questions: totalQuestions,
-          total_points: currentPoints,
-          avg_score: newAvgScore,
-          daily_streak: dailyStreak,
-          last_played: now.toISOString()
-        }, { onConflict: 'user_id' });
-
-      // 3. Save Game Session
-      await supabase
-        .from('game_sessions')
-        .insert({
-          user_id: userId,
-          game_mode: 'history',
-          score: score * 100,
-          played_at: new Date().toISOString()
-        });
-
-    } catch (err) {
-      console.error("Error saving stats:", err);
-    }
-  };
-
+  // 3. LOGIC
   async function fetchQuestions() {
     try {
-      // Fetch history questions
       const { data, error } = await supabase
         .from('questions')
         .select('*')
@@ -146,42 +65,64 @@ function NBAHistoryQuiz() {
     }
   }
 
-  if (loading) {
-    return <div className="loading-screen">Loading Quiz...</div>;
-  }
+  const saveGameStats = async () => {
+    const token = Cookies.get('auth_token');
+    if (!token) return;
 
-  if (questions.length === 0) {
-    return <div className="error-message">No questions found.</div>;
-  }
+    try {
+      await fetch('/api/submit-game', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          gameMode: 'history',
+          answers: answers.map(a => ({
+            questionId: a.questionId,
+            selectedAnswer: a.selectedAnswer
+          }))
+        })
+      });
+    } catch (err) {
+      console.error("Error saving stats:", err);
+    }
+  };
 
   const handleAnswerSelect = (index) => {
     if (showResult) return;
+
     setSelectedAnswer(index);
     setShowResult(true);
 
-    const isCorrect = index === questions[currentQuestion].correct;
+    const question = questions[currentQuestion];
+    const isCorrect = index === question.correct;
+
     if (isCorrect) {
+      soundManager.play('correct');
       setScore(score + 1);
+      setTotalPoints(totalPoints + question.points);
+    } else {
+      soundManager.play('wrong');
     }
 
-    setAnswers([
-      ...answers,
-      {
-        question: questions[currentQuestion].question,
-        selected: index,
-        correct: questions[currentQuestion].correct,
-        isCorrect
-      }
-    ]);
+    setAnswers([...answers, {
+      questionId: question.id,
+      selectedAnswer: index,
+      question: question.question,
+      selected: index,
+      correct: question.correct,
+      isCorrect: isCorrect,
+      points: isCorrect ? question.points : 0,
+      difficulty: question.difficulty
+    }]);
   };
 
   const handleNext = () => {
-    if (currentQuestion < questions.length - 1) {
+    if (currentQuestion >= questions.length - 1) {
+      setGameComplete(true);
+    } else {
       setCurrentQuestion(currentQuestion + 1);
       setSelectedAnswer(null);
       setShowResult(false);
-    } else {
-      setGameComplete(true);
     }
   };
 
@@ -189,158 +130,64 @@ function NBAHistoryQuiz() {
     navigate('/login');
   };
 
-  const percentage = Math.round((score / questions.length) * 100);
-  const progress = ((currentQuestion + 1) / questions.length) * 100;
+  // 4. RENDER
+  if (loading) {
+    return (
+      <div className="history-quiz-game">
+        <Navbar onLogout={() => { }} />
+        <div className="game-container">
+          <Skeleton type="title" style={{ width: '100%', height: '300px' }} />
+        </div>
+      </div>
+    );
+  }
+
+  if (questions.length === 0) {
+    return (
+      <div className="history-quiz-game">
+        <Navbar onLogout={handleLogout} />
+        <div className="game-container">
+          <div className="error-message">No history questions found!</div>
+        </div>
+      </div>
+    );
+  }
 
   if (gameComplete) {
     return (
       <div className="history-quiz-game">
         <Navbar onLogout={handleLogout} />
         <div className="game-container">
-          <div className="results-screen">
-            <h1>Quiz Complete!</h1>
-            <div className="results-summary">
-              <div className="circular-progress">
-                <div className="progress-circle">
-                  <svg width="200" height="200">
-                    <circle
-                      cx="100"
-                      cy="100"
-                      r="90"
-                      fill="none"
-                      stroke="var(--light-gray)"
-                      strokeWidth="12"
-                    />
-                    <circle
-                      cx="100"
-                      cy="100"
-                      r="90"
-                      fill="none"
-                      stroke="var(--green)"
-                      strokeWidth="12"
-                      strokeDasharray={`${2 * Math.PI * 90} `}
-                      strokeDashoffset={`${2 * Math.PI * 90 * (1 - percentage / 100)} `}
-                      strokeLinecap="round"
-                      transform="rotate(-90 100 100)"
-                    />
-                  </svg>
-                  <div className="circular-progress-text">
-                    <div className="progress-percentage">{percentage}%</div>
-                    <div className="progress-label">Correct</div>
-                  </div>
-                </div>
-              </div>
-              <div className="score-details">
-                <div className="score-item">
-                  <span className="score-label">Score:</span>
-                  <span className="score-value">{score}/{questions.length}</span>
-                </div>
-                <div className="score-item">
-                  <span className="score-label">Points Earned:</span>
-                  <span className="score-value">{score * 100}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="questions-review">
-              <h2>Question Review</h2>
-              {answers.map((answer, index) => (
-                <div key={index} className={`review - item ${answer.isCorrect ? 'correct' : 'incorrect'} `}>
-                  <div className="review-icon">
-                    {answer.isCorrect ? '✓' : '✗'}
-                  </div>
-                  <div className="review-content">
-                    <div className="review-question">{answer.question}</div>
-                    <div className={`review - answer ${answer.isCorrect ? 'correct' : 'incorrect'} `}>
-                      {answer.isCorrect ? 'Correct!' : 'Incorrect'}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="game-actions">
-              <button
-                className="btn btn-orange"
-                onClick={() => window.location.reload()}
-              >
-                Play Again
-              </button>
-              <Link to="/dashboard" className="btn btn-secondary">
-                Return Home
-              </Link>
-            </div>
-          </div>
+          <GameResults
+            title="History Lesson Complete!"
+            score={score}
+            total={questions.length}
+            points={totalPoints}
+            gameMode="history"
+          >
+            <QuestionReviewList answers={answers} />
+          </GameResults>
         </div>
       </div>
     );
   }
 
-  const question = questions[currentQuestion];
-
   return (
     <div className="history-quiz-game">
       <Navbar onLogout={handleLogout} />
-      <div className="game-container">
-        <div className="progress-bar-container">
-          <div className="progress-bar">
-            <div
-              className="progress-fill"
-              style={{ width: `${progress}% ` }}
-            ></div>
-          </div>
-          <div className="progress-text">
-            Question {currentQuestion + 1} of {questions.length}
-          </div>
-        </div>
 
-        <div className="question-card">
-          <h2 className="question-text">{question.question}</h2>
-
-          <div className="answers-grid">
-            {question.options.map((option, index) => {
-              let buttonClass = 'answer-button';
-              if (showResult) {
-                if (index === question.correct) {
-                  buttonClass += ' correct';
-                } else if (index === selectedAnswer && index !== question.correct) {
-                  buttonClass += ' incorrect';
-                }
-              } else if (index === selectedAnswer) {
-                buttonClass += ' selected';
-              }
-
-              return (
-                <button
-                  key={index}
-                  className={buttonClass}
-                  onClick={() => handleAnswerSelect(index)}
-                  disabled={showResult}
-                >
-                  {option}
-                </button>
-              );
-            })}
-          </div>
-
-          {showResult && (
-            <div className="result-feedback">
-              <div className={`feedback - message ${selectedAnswer === question.correct ? 'correct' : 'incorrect'} `}>
-                {selectedAnswer === question.correct ? '✓ Correct!' : '✗ Incorrect'}
-              </div>
-              <div className="fact-box">
-                <strong>Did you know?</strong> {question.fact}
-              </div>
-              <button className="btn btn-primary btn-full" onClick={handleNext}>
-                {currentQuestion < questions.length - 1 ? 'Next Question' : 'View Results'}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+      <GameQuestion
+        question={questions[currentQuestion]}
+        currentIndex={currentQuestion}
+        total={questions.length}
+        score={totalPoints}
+        selectedAnswer={selectedAnswer}
+        showResult={showResult}
+        handleAnswerSelect={handleAnswerSelect}
+        handleNext={handleNext}
+      />
     </div>
   );
 }
 
 export default NBAHistoryQuiz;
-

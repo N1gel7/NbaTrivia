@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
 
@@ -17,12 +18,11 @@ export default async function handler(req, res) {
         return res.status(400).json({ message: 'Token and new password are required' });
     }
 
-
+    // Prevent script injection attacks by blocking common HTML/JS patterns
     const xssPattern = /(<script)|(<iframe)|(<object)|(<embed)|(<link)|(on\w+\s*=)|(javascript:)|(vbscript:)/i;
     if (xssPattern.test(token)) {
         return res.status(400).json({ message: 'Invalid input detected ' });
     }
-
 
     const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
     if (!strongPasswordRegex.test(newPassword)) {
@@ -30,7 +30,7 @@ export default async function handler(req, res) {
     }
 
     try {
-
+        // Validate Reset Token
         const { data: resetRecord, error: fetchError } = await supabase
             .from('password_resets')
             .select('*')
@@ -41,16 +41,14 @@ export default async function handler(req, res) {
             return res.status(400).json({ message: 'Invalid or expired token' });
         }
 
-        // Check Expiry
         if (new Date(resetRecord.expires_at) < new Date()) {
             return res.status(400).json({ message: 'Token expired' });
         }
 
-        //  Hash New Password
+        // Securely Hash New Password
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(newPassword, salt);
 
-        // Update User Password
         const { error: updateError } = await supabase
             .from('users')
             .update({ password_hash: passwordHash })
@@ -58,7 +56,7 @@ export default async function handler(req, res) {
 
         if (updateError) throw updateError;
 
-        // Delete Used Token (and any old tokens for this user)
+        // Invalidate used token and all other tokens for this user
         await supabase
             .from('password_resets')
             .delete()
