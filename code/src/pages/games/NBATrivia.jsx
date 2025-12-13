@@ -42,7 +42,6 @@ function NBATrivia() {
       } else {
         celebrateGameComplete();
       }
-      soundManager.play('complete');
     }
   }, [gameComplete]);
 

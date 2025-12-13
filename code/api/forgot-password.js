@@ -95,7 +95,10 @@ export default async function handler(req, res) {
 
         if (insertError) throw insertError;
 
-        const resetLink = `http://localhost:3000/reset-password?token=${token}`;
+        const protocol = req.headers['x-forwarded-proto'] || 'http';
+        const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000';
+        const baseUrl = `${protocol}://${host}`;
+        const resetLink = `${baseUrl}/reset-password?token=${token}`;
 
         // Email Dispatch
         if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {

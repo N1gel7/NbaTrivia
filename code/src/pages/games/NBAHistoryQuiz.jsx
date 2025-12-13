@@ -40,7 +40,6 @@ function NBAHistoryQuiz() {
       } else {
         celebrateGameComplete();
       }
-      soundManager.play('complete');
     }
   }, [gameComplete]);
 

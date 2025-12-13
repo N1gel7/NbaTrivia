@@ -4,9 +4,7 @@ class SoundManager {
         this.enabled = true;
         this.sounds = {
             correct: new Audio('/sounds/correct.mp3'),
-            wrong: new Audio('/sounds/wrong.mp3'),
-            complete: new Audio('/sounds/complete.mp3')
-
+            wrong: new Audio('/sounds/wrong.mp3')
         };
 
 

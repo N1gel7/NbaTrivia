@@ -35,7 +35,6 @@ function GuessThePlayer() {
     if (gameComplete) {
       saveGameStats();
       celebrateGameComplete();
-      soundManager.play('complete');
     }
   }, [gameComplete]);
 

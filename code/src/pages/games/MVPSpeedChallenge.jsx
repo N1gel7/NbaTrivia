@@ -140,7 +140,6 @@ function MVPSpeedChallenge() {
   const endGame = async () => {
     setGameState('post');
     celebrateGameComplete();
-    soundManager.play('complete');
 
     // Update PB locally if beaten
     if (score > personalBest) {
