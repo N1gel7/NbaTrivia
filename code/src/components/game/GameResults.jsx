@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import ShareButton from '../ShareButton';
 import './GameResults.css';
 
@@ -10,8 +10,7 @@ function GameResults(props) {
     const points = props.points || 0;
     const gameMode = props.gameMode || 'trivia';
     const children = props.children;
-
-    const navigate = useNavigate();
+    const onPlayAgain = props.onPlayAgain;
 
     let accuracy = 0;
     if (total > 0) {
@@ -19,22 +18,12 @@ function GameResults(props) {
     }
 
     const handlePlayAgain = () => {
-        // Map game modes to their routes
-        const gameRoutes = {
-            'trivia': '/games/nba-trivia',
-            'guess_player': '/games/guess-the-player',
-            'mvp_speed': '/games/mvp-speed-challenge'
-        };
-
-        const route = gameRoutes[gameMode] || '/dashboard';
-
-        // Navigate to the same route, forcing a remount
-        navigate(route, { replace: true });
-
-        // Small delay to ensure navigation completes, then navigate again to force remount
-        setTimeout(() => {
-            navigate(route);
-        }, 10);
+        if (onPlayAgain) {
+            onPlayAgain();
+        } else {
+            // Fallback to reload if no callback provided
+            window.location.reload();
+        }
     };
 
     return (

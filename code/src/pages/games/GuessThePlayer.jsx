@@ -89,7 +89,7 @@ function GuessThePlayer() {
     }
   };
 
-  const resetGame = () => {
+  const resetGame = async () => {
     setCurrentPlayerIndex(0);
     setCurrentClueIndex(0);
     setGuess('');
@@ -97,6 +97,8 @@ function GuessThePlayer() {
     setGameComplete(false);
     setRevealed(false);
     setGameHistory([]);
+    setLoading(true);
+    await fetchGameData();
   };
 
   if (loading) {

@@ -162,13 +162,15 @@ function MVPSpeedChallenge() {
     }
   };
 
-  const resetGame = () => {
+  const resetGame = async () => {
     setGameState('pre');
     setTimeLeft(60);
     setInput('');
     setCorrectAnswers([]);
     setIncorrectAnswers([]);
     setScore(0);
+    setLoading(true);
+    await fetchGameData();
   };
 
   // 4. RENDER

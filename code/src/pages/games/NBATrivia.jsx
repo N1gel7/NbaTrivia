@@ -137,7 +137,7 @@ function NBATrivia() {
     navigate('/login');
   };
 
-  const resetGame = () => {
+  const resetGame = async () => {
     setCurrentQuestion(0);
     setSelectedAnswer(null);
     setShowResult(false);
@@ -145,6 +145,8 @@ function NBATrivia() {
     setTotalPoints(0);
     setAnswers([]);
     setGameComplete(false);
+    setLoading(true);
+    await fetchQuestions();
   };
 
   // 4. RENDER
