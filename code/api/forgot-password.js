@@ -97,7 +97,7 @@ export default async function handler(req, res) {
 
         const protocol = req.headers['x-forwarded-proto'] || 'http';
         const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000';
-        const baseUrl = `${protocol}://${host}`;
+        const baseUrl = process.env.FRONTEND_URL || `${protocol}://${host}`;
         const resetLink = `${baseUrl}/reset-password?token=${token}`;
 
         // Email Dispatch
