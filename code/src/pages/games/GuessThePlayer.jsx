@@ -20,6 +20,7 @@ function GuessThePlayer() {
   const [gameComplete, setGameComplete] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [gameHistory, setGameHistory] = useState([]);
+  const [showWrongNotification, setShowWrongNotification] = useState(false);
 
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -174,7 +175,8 @@ function GuessThePlayer() {
       }]);
     } else {
       soundManager.play('wrong');
-      alert('Incorrect! Try again or reveal the next clue.');
+      setShowWrongNotification(true);
+      setTimeout(() => setShowWrongNotification(false), 2000);
     }
   };
 
@@ -213,6 +215,19 @@ function GuessThePlayer() {
   return (
     <div className="guess-player-game">
       <Navbar onLogout={() => navigate('/login')} />
+
+      {/* Wrong Answer Notification */}
+      {showWrongNotification && (
+        <div className="wrong-notification">
+          <div className="notification-content">
+            <div className="notification-icon">❌</div>
+            <div className="notification-text">
+              <div className="notification-title">Incorrect!</div>
+              <div className="notification-subtitle">Try again or reveal the next clue</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="game-container">
         {/* Header */}

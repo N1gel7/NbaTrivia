@@ -1,6 +1,80 @@
 .guess-player-game {
   min-height: 100vh;
   background: linear-gradient(135deg, var(--cream) 0%, var(--off-white) 100%);
+  position: relative;
+}
+
+/* Wrong Answer Notification */
+.wrong-notification {
+  position: fixed;
+  top: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.notification-content {
+  background: linear-gradient(135deg, rgba(244, 67, 54, 0.95) 0%, rgba(211, 47, 47, 0.95) 100%);
+  backdrop-filter: blur(10px);
+  color: white;
+  padding: 20px 32px;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(244, 67, 54, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 320px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.notification-icon {
+  font-size: 32px;
+  animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-10px);
+  }
+
+  75% {
+    transform: translateX(10px);
+  }
+}
+
+.notification-text {
+  flex: 1;
+}
+
+.notification-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.notification-subtitle {
+  font-size: 14px;
+  opacity: 0.9;
+  font-weight: 500;
 }
 
 .game-container {
