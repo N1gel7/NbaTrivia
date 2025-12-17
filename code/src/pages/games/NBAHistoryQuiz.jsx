@@ -129,6 +129,18 @@ function NBAHistoryQuiz() {
     navigate('/login');
   };
 
+  const resetGame = async () => {
+    setCurrentQuestion(0);
+    setSelectedAnswer(null);
+    setShowResult(false);
+    setScore(0);
+    setTotalPoints(0);
+    setAnswers([]);
+    setGameComplete(false);
+    setLoading(true);
+    await fetchQuestions();
+  };
+
   // 4. RENDER
   if (loading) {
     return (
@@ -163,6 +175,7 @@ function NBAHistoryQuiz() {
             total={questions.length}
             points={totalPoints}
             gameMode="history"
+            onPlayAgain={resetGame}
           >
             <QuestionReviewList answers={answers} />
           </GameResults>
