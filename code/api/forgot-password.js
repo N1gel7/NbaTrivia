@@ -8,6 +8,37 @@ const supabase = createClient(
     process.env.VITE_SUPABASE_ANON_KEY
 );
 
+// Create singleton transporter instance with connection pooling
+let transporter = null;
+let transporterReady = false;
+
+function getTransporter() {
+    if (!transporter && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+        transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS
+            },
+            pool: true, // Enable connection pooling
+            maxConnections: 5,
+            maxMessages: 100,
+            rateDelta: 1000,
+            rateLimit: 5
+        });
+
+        // Verify transporter on first creation
+        transporter.verify((error, success) => {
+            if (error) {
+                transporterReady = false;
+            } else {
+                transporterReady = true;
+            }
+        });
+    }
+    return transporter;
+}
+
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ message: 'Method not allowed' });
@@ -100,15 +131,15 @@ export default async function handler(req, res) {
         const baseUrl = process.env.FRONTEND_URL || `${protocol}://${host}`;
         const resetLink = `${baseUrl}/reset-password?token=${token}`;
 
-        // Email Dispatch
+        // Email Dispatch with proper error handling
         if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-            const transporter = nodemailer.createTransport({
-                service: 'gmail',
-                auth: {
-                    user: process.env.EMAIL_USER,
-                    pass: process.env.EMAIL_PASS
-                }
-            });
+            const emailTransporter = getTransporter();
+
+            if (!emailTransporter) {
+                return res.status(500).json({
+                    message: 'Email service unavailable. Please contact support.'
+                });
+            }
 
             const mailOptions = {
                 from: process.env.EMAIL_USER,
@@ -124,23 +155,20 @@ export default async function handler(req, res) {
             };
 
             try {
-                await transporter.sendMail(mailOptions);
+                const info = await emailTransporter.sendMail(mailOptions);
+
+                return res.status(200).json({
+                    message: 'Password reset link has been sent to your email.'
+                });
             } catch (emailErr) {
-                console.error("Email send failed (falling back to console log):", emailErr.message);
+                // Return error to user instead of hiding it
+                return res.status(500).json({
+                    message: 'Failed to send email. Please try again or contact support.'
+                });
             }
-        } else {
-            console.log("No EMAIL_USER or EMAIL_PASS set. Mocking email send.");
         }
 
-
-        console.log(`[DEV] Password Reset Link: ${resetLink}`);
-
-        return res.status(200).json({
-            message: 'If an account exists, a reset link has been sent. (Check server console for link if email failed)'
-        });
-
     } catch (error) {
-        console.error('Forgot Password Error:', error);
         return res.status(500).json({ message: 'Internal server error' });
     }
 }
