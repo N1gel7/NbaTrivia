@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import ShareButton from '../ShareButton';
 import './GameResults.css';
 
@@ -11,15 +11,30 @@ function GameResults(props) {
     const gameMode = props.gameMode || 'trivia';
     const children = props.children;
 
+    const navigate = useNavigate();
 
     let accuracy = 0;
     if (total > 0) {
         accuracy = Math.round((score / total) * 100);
     }
 
-
     const handlePlayAgain = () => {
-        window.location.reload();
+        // Map game modes to their routes
+        const gameRoutes = {
+            'trivia': '/games/nba-trivia',
+            'guess_player': '/games/guess-the-player',
+            'mvp_speed': '/games/mvp-speed-challenge'
+        };
+
+        const route = gameRoutes[gameMode] || '/dashboard';
+
+        // Navigate to the same route, forcing a remount
+        navigate(route, { replace: true });
+
+        // Small delay to ensure navigation completes, then navigate again to force remount
+        setTimeout(() => {
+            navigate(route);
+        }, 10);
     };
 
     return (

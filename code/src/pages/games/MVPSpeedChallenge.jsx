@@ -12,7 +12,7 @@ import './MVPSpeedChallenge.css';
 
 function MVPSpeedChallenge() {
   // 1. STATE
-  const [gameState, setGameState] = useState('pre'); // 'pre', 'playing', 'post'
+  const [gameState, setGameState] = useState('pre');
   const [timeLeft, setTimeLeft] = useState(60);
   const [input, setInput] = useState('');
   const [correctAnswers, setCorrectAnswers] = useState([]);
@@ -63,7 +63,6 @@ function MVPSpeedChallenge() {
       // Fetch personal best
       const token = Cookies.get('auth_token');
       if (token) {
-        // Decode manually or use helper if imported (we'll just use simple decode here for speed)
         try {
           const decoded = JSON.parse(atob(token.split('.')[1]));
           if (decoded?.id) {
@@ -76,7 +75,7 @@ function MVPSpeedChallenge() {
 
             if (stats) setPersonalBest(stats.best_score);
           }
-        } catch (e) { /* ignore invalid token */ }
+        } catch (e) { }
       }
 
       setLoading(false);
@@ -93,7 +92,6 @@ function MVPSpeedChallenge() {
     setIncorrectAnswers([]);
     setScore(0);
     setInput('');
-    // Focus input slightly after render
     setTimeout(() => {
       if (inputRef.current) inputRef.current.focus();
     }, 100);
@@ -141,7 +139,6 @@ function MVPSpeedChallenge() {
     setGameState('post');
     celebrateGameComplete();
 
-    // Update PB locally if beaten
     if (score > personalBest) {
       setPersonalBest(score);
     }

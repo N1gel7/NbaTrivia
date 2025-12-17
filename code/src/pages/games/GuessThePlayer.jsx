@@ -90,7 +90,6 @@ function GuessThePlayer() {
   };
 
   if (loading) {
-    // Keep skeleton logic simple
     return (
       <div className="guess-player-game">
         <Navbar onLogout={() => { }} />
@@ -266,7 +265,6 @@ function GuessThePlayer() {
         {/* Progress Dots */}
         <div className="clues-progress">
           {currentPlayer.clues.map((_, index) => {
-            // Explicit class logic
             let dotClass = 'clue-dot';
             if (index <= currentClueIndex) {
               dotClass += ' revealed';

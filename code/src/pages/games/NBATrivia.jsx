@@ -139,8 +139,6 @@ function NBATrivia() {
 
   // 4. RENDER
   if (loading) {
-    // Keep the skeleton for specific page feel, or make a component
-    // For now, I'll simplify the skeleton code here to keep file small
     return (
       <div className="trivia-game">
         <Navbar onLogout={() => { }} />
