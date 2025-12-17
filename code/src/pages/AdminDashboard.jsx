@@ -263,51 +263,123 @@ function AdminDashboard() {
 
                 {/* Stats Bar */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px', marginBottom: '32px' }}>
-                    <div style={{
-                        background: 'rgba(255, 255, 255, 0.4)',
-                        backdropFilter: 'blur(12px)',
-                        border: '1px solid rgba(255, 255, 255, 0.3)',
-                        borderRadius: '24px',
-                        padding: '24px',
-                        position: 'relative',
-                        overflow: 'hidden'
-                    }}>
+                    <div
+                        style={{
+                            background: 'rgba(255, 255, 255, 0.4)',
+                            backdropFilter: 'blur(12px)',
+                            border: '1px solid rgba(255, 255, 255, 0.3)',
+                            borderRadius: '24px',
+                            padding: '24px',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                            cursor: 'default',
+                            transform: 'translateY(0)',
+                            boxShadow: 'none'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-5px)';
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.6)';
+                            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+                            e.currentTarget.style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.4)';
+                            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                            e.currentTarget.style.boxShadow = 'none';
+                        }}
+                    >
                         <div style={{ fontSize: '2rem', fontWeight: '700', color: '#1d428a' }}>{stats.total}</div>
                         <div style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>Total Questions</div>
                     </div>
-                    <div style={{
-                        background: 'rgba(255, 255, 255, 0.4)',
-                        backdropFilter: 'blur(12px)',
-                        border: '1px solid rgba(255, 255, 255, 0.3)',
-                        borderRadius: '24px',
-                        padding: '24px',
-                        position: 'relative',
-                        overflow: 'hidden'
-                    }}>
+                    <div
+                        style={{
+                            background: 'rgba(255, 255, 255, 0.4)',
+                            backdropFilter: 'blur(12px)',
+                            border: '1px solid rgba(255, 255, 255, 0.3)',
+                            borderRadius: '24px',
+                            padding: '24px',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                            cursor: 'default',
+                            transform: 'translateY(0)',
+                            boxShadow: 'none'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-5px)';
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.6)';
+                            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+                            e.currentTarget.style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.4)';
+                            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                            e.currentTarget.style.boxShadow = 'none';
+                        }}
+                    >
                         <div style={{ fontSize: '2rem', fontWeight: '700', color: '#10b981' }}>{stats.easy}</div>
                         <div style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>Easy</div>
                     </div>
-                    <div style={{
-                        background: 'rgba(255, 255, 255, 0.4)',
-                        backdropFilter: 'blur(12px)',
-                        border: '1px solid rgba(255, 255, 255, 0.3)',
-                        borderRadius: '24px',
-                        padding: '24px',
-                        position: 'relative',
-                        overflow: 'hidden'
-                    }}>
+                    <div
+                        style={{
+                            background: 'rgba(255, 255, 255, 0.4)',
+                            backdropFilter: 'blur(12px)',
+                            border: '1px solid rgba(255, 255, 255, 0.3)',
+                            borderRadius: '24px',
+                            padding: '24px',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                            cursor: 'default',
+                            transform: 'translateY(0)',
+                            boxShadow: 'none'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-5px)';
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.6)';
+                            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+                            e.currentTarget.style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.4)';
+                            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                            e.currentTarget.style.boxShadow = 'none';
+                        }}
+                    >
                         <div style={{ fontSize: '2rem', fontWeight: '700', color: '#f59e0b' }}>{stats.medium}</div>
                         <div style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>Medium</div>
                     </div>
-                    <div style={{
-                        background: 'rgba(255, 255, 255, 0.4)',
-                        backdropFilter: 'blur(12px)',
-                        border: '1px solid rgba(255, 255, 255, 0.3)',
-                        borderRadius: '24px',
-                        padding: '24px',
-                        position: 'relative',
-                        overflow: 'hidden'
-                    }}>
+                    <div
+                        style={{
+                            background: 'rgba(255, 255, 255, 0.4)',
+                            backdropFilter: 'blur(12px)',
+                            border: '1px solid rgba(255, 255, 255, 0.3)',
+                            borderRadius: '24px',
+                            padding: '24px',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                            cursor: 'default',
+                            transform: 'translateY(0)',
+                            boxShadow: 'none'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-5px)';
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.6)';
+                            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+                            e.currentTarget.style.boxShadow = '0 10px 25px rgba(0, 0, 0, 0.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.4)';
+                            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                            e.currentTarget.style.boxShadow = 'none';
+                        }}
+                    >
                         <div style={{ fontSize: '2rem', fontWeight: '700', color: '#ef4444' }}>{stats.hard}</div>
                         <div style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>Hard</div>
                     </div>
