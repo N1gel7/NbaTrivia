@@ -162,6 +162,15 @@ function MVPSpeedChallenge() {
     }
   };
 
+  const resetGame = () => {
+    setGameState('pre');
+    setTimeLeft(60);
+    setInput('');
+    setCorrectAnswers([]);
+    setIncorrectAnswers([]);
+    setScore(0);
+  };
+
   // 4. RENDER
   if (loading) {
     return (
@@ -190,6 +199,7 @@ function MVPSpeedChallenge() {
             total={totalMVPs}
             points={score} /* 1 pt per MVP */
             gameMode="mvp_speed"
+            onPlayAgain={resetGame}
           >
             {/* Custom Breakdown for Speed Mode */}
             <div className="results-breakdown">

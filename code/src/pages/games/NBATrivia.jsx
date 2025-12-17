@@ -137,6 +137,16 @@ function NBATrivia() {
     navigate('/login');
   };
 
+  const resetGame = () => {
+    setCurrentQuestion(0);
+    setSelectedAnswer(null);
+    setShowResult(false);
+    setScore(0);
+    setTotalPoints(0);
+    setAnswers([]);
+    setGameComplete(false);
+  };
+
   // 4. RENDER
   if (loading) {
     return (
@@ -172,6 +182,7 @@ function NBATrivia() {
             total={questions.length}
             points={totalPoints}
             gameMode="trivia"
+            onPlayAgain={resetGame}
           >
             <QuestionReviewList answers={answers} />
           </GameResults>

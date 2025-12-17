@@ -89,6 +89,16 @@ function GuessThePlayer() {
     }
   };
 
+  const resetGame = () => {
+    setCurrentPlayerIndex(0);
+    setCurrentClueIndex(0);
+    setGuess('');
+    setScore(0);
+    setGameComplete(false);
+    setRevealed(false);
+    setGameHistory([]);
+  };
+
   if (loading) {
     return (
       <div className="guess-player-game">
@@ -125,6 +135,7 @@ function GuessThePlayer() {
             total={players.length}
             points={score}
             gameMode="guess_player"
+            onPlayAgain={resetGame}
           >
             <GuessHistoryList history={gameHistory} maxClues={5} />
           </GameResults>
