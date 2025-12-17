@@ -635,17 +635,28 @@ function AdminDashboard() {
                                 fontSize: '0.95rem',
                                 fontWeight: filterCategory === cat ? '600' : '500',
                                 cursor: 'pointer',
-                                transition: 'all 0.2s ease',
-                                boxShadow: filterCategory === cat ? '0 2px 8px rgba(29, 66, 138, 0.25)' : 'none'
+                                transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                                boxShadow: filterCategory === cat ? '0 4px 12px rgba(29, 66, 138, 0.3)' : 'none',
+                                transform: 'translateY(0)'
                             }}
                             onMouseEnter={(e) => {
                                 if (filterCategory !== cat) {
-                                    e.target.style.background = 'var(--bg-primary)';
+                                    e.target.style.background = 'rgba(29, 66, 138, 0.1)';
+                                    e.target.style.transform = 'translateY(-2px)';
+                                    e.target.style.boxShadow = '0 4px 8px rgba(29, 66, 138, 0.15)';
+                                } else {
+                                    e.target.style.transform = 'translateY(-2px)';
+                                    e.target.style.boxShadow = '0 6px 16px rgba(29, 66, 138, 0.4)';
                                 }
                             }}
                             onMouseLeave={(e) => {
                                 if (filterCategory !== cat) {
                                     e.target.style.background = 'transparent';
+                                    e.target.style.transform = 'translateY(0)';
+                                    e.target.style.boxShadow = 'none';
+                                } else {
+                                    e.target.style.transform = 'translateY(0)';
+                                    e.target.style.boxShadow = '0 4px 12px rgba(29, 66, 138, 0.3)';
                                 }
                             }}
                         >
