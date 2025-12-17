@@ -1,6 +1,5 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import ShareButton from '../ShareButton';
 import './GameResults.css';
 
 function GameResults(props) {
@@ -51,13 +50,6 @@ function GameResults(props) {
             </div>
 
             <div className="game-actions">
-                <ShareButton
-                    score={score}
-                    total={total}
-                    gameMode={gameMode}
-                    points={points}
-                />
-
                 <button
                     className="btn btn-orange"
                     onClick={handlePlayAgain}
